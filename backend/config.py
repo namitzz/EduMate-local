@@ -33,7 +33,7 @@ MULTI_QUERY  = False    # re-enable later for recall
 # LLM (Ollama)
 # -----------------------
 # docker-compose.yml sets OLLAMA_HOST to http://host.docker.internal:11434
-OLLAMA_MODEL = "msitral.latest"     # <- switch here
+OLLAMA_MODEL = "mistral.latest"     # <- switch here
 OLLAMA_HOST  = "http://host.docker.internal:11434"
 
 # Generation controls (kept tight to stay snappy)

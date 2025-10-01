@@ -1,14 +1,14 @@
 import os, requests, json, time
-from .config import OLLAMA_HOST, OLLAMA_MODEL, MAX_TOKENS, TEMPERATURE
+import config
 
 def ollama_complete(prompt: str, model: str | None = None) -> str:
-    url = (OLLAMA_HOST or os.getenv("OLLAMA_HOST") or "http://host.docker.internal:11434").rstrip("/")
-    model = model or OLLAMA_MODEL
+    url = (config.OLLAMA_HOST or os.getenv("OLLAMA_HOST") or "http://host.docker.internal:11434").rstrip("/")
+    model = model or config.OLLAMA_MODEL
     payload = {
         "model": model,
         "prompt": prompt,
         "stream": False,
-        "options": {"temperature": TEMPERATURE, "num_predict": MAX_TOKENS},
+        "options": {"temperature": config.TEMPERATURE, "num_predict": config.MAX_TOKENS},
         "keep_alive": "2h",
     }
 
@@ -27,13 +27,4 @@ def ollama_complete(prompt: str, model: str | None = None) -> str:
             last_err = e
             time.sleep(2 + 2*attempt)  # backoff: 2s, 4s, 6s
     raise RuntimeError(f"Ollama call failed after retries: {last_err}")
-try:
-    answer = ollama_complete(prompt)
-except Exception as e:
-    logger.exception("Generation failed")
-    return {
-        "answer": "I retrieved context but couldn't generate an answer. (LLM error)",
-        "error": str(e)[:200],
-        "sources": sources,
-    }
 
