@@ -1,4 +1,5 @@
 from typing import List, Dict, Optional
+import re
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -23,6 +24,32 @@ retriever = Retriever()
 # --- Schemas ---
 class ChatRequest(BaseModel):
     messages: List[Dict]
+
+
+# --- Greeting detection ---
+def is_greeting_or_chitchat(msg: str) -> bool:
+    """
+    Detect if the message is a greeting or simple chitchat that doesn't require
+    retrieval from course materials.
+    """
+    msg_lower = msg.strip().lower()
+    
+    # Very short messages (likely greetings)
+    if len(msg_lower) <= 15:
+        # Common greeting patterns
+        greeting_patterns = [
+            r'^(hi|hello|hey|hii|hiii|heya|heyy|heyyy|howdy|greetings|sup|yo)([!.?]*)?$',
+            r'^(good\s+(morning|afternoon|evening|day|night))([!.?]*)?$',
+            r'^(what\'?s?\s+up|wassup|whats\s+up)([!.?]*)?$',
+            r'^(how\s+(are|r)\s+(you|u))([!.?]*)?$',
+            r'^(how\'?s?\s+it\s+going)([!.?]*)?$',
+        ]
+        
+        for pattern in greeting_patterns:
+            if re.match(pattern, msg_lower):
+                return True
+    
+    return False
 
 
 # --- Prompt builder ---
@@ -74,6 +101,15 @@ def chat(req: ChatRequest):
             break
     if not last_user:
         raise HTTPException(status_code=400, detail="No user message provided")
+
+    # Check if it's a greeting or chitchat
+    if is_greeting_or_chitchat(last_user):
+        greeting_response = (
+            "Hello! I'm EduMate, your study assistant. "
+            "I'm here to help you with questions about your course materials. "
+            "What would you like to know?"
+        )
+        return {"answer": greeting_response, "sources": []}
 
     # retrieve context
     ctx = []
