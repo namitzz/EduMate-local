@@ -34,7 +34,7 @@ MULTI_QUERY  = False    # re-enable later for recall
 # -----------------------
 # docker-compose.yml sets OLLAMA_HOST to http://ollama:11434
 OLLAMA_MODEL = "mistral"     # <- switch here
-OLLAMA_HOST  = "http://localhost:11434"  # default for local non-Docker setup
+OLLAMA_HOST  = "http://ollama:11434"  # default for local non-Docker setup
 
 # Generation controls (balanced for quality and speed)
 MAX_TOKENS   = 800  # Increased from 320 to allow complete answers
