@@ -32,9 +32,9 @@ MULTI_QUERY  = False    # re-enable later for recall
 # -----------------------
 # LLM (Ollama)
 # -----------------------
-# docker-compose.yml sets OLLAMA_HOST to http://host.docker.internal:11434
-OLLAMA_MODEL = "mistral.latest"     # <- switch here
-OLLAMA_HOST  = "http://host.docker.internal:11434"
+# docker-compose.yml sets OLLAMA_HOST to http://ollama:11434
+OLLAMA_MODEL = "mistral"     # <- switch here
+OLLAMA_HOST  = "http://localhost:11434"  # default for local non-Docker setup
 
 # Generation controls (kept tight to stay snappy)
 MAX_TOKENS   = 320
