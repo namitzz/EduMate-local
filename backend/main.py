@@ -69,9 +69,10 @@ def compose_prompt(contexts: List[Dict], user_msg: str):
         sources.append(f"{marker} {meta.get('file')} (chunk {meta.get('chunk')})")
 
     system = (
-        "You are EduMate, a study assistant. Use ONLY the provided context. "
-        "If the answer is not in the context, say you don't have that information. "
-        "Be concise and clear. Add inline markers [①, ②, ...] when citing."
+        "You are EduMate, a helpful study assistant. Answer the user's question based on the provided context. "
+        "If the information is in the context, provide a clear and direct answer. "
+        "If the answer is not in the context, politely say so and suggest the user consult other resources. "
+        "Be concise but complete. Add inline citation markers [①, ②, ...] when referencing specific sources."
     )
 
     context_block = "\n".join(ctx_text) if ctx_text else "(no context)"
@@ -138,13 +139,21 @@ def chat(req: ChatRequest):
     answer = ""
     try:
         answer = ollama_complete(prompt)
+        print(f"[DEBUG] Ollama response length: {len(answer)} chars")
     except Exception as e:
         print("Ollama call error:", repr(e))
         answer = "[Error: Ollama call failed]"
 
     if not answer or answer.strip() in {"", "[Error: Ollama call failed]"}:
-        fallback = ("I retrieved context but couldn't generate an answer. "
-                    "Please retry or narrow your question.")
+        # Enhanced fallback message with actionable guidance
+        fallback = (
+            "I found relevant information in the course materials, but I'm having trouble "
+            "generating a complete answer right now. Here are some suggestions:\n\n"
+            "• Try rephrasing your question more specifically\n"
+            "• Break complex questions into simpler parts\n"
+            "• Check the sources panel on the left for relevant document sections\n\n"
+            "If the issue persists, the system may need to be restarted."
+        )
         return {"answer": fallback, "sources": sources}
 
     return {"answer": answer, "sources": sources}

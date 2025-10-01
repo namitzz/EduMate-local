@@ -22,6 +22,8 @@ def ollama_complete(prompt: str, model: str | None = None) -> str:
             text = (data.get("response") or "").strip()
             if text:
                 return text
+            # Log when we get empty response
+            print(f"[WARNING] Ollama returned empty response. Full data: {data}")
             raise RuntimeError("Empty response from Ollama")
         except (requests.ReadTimeout, requests.ConnectionError, requests.HTTPError, json.JSONDecodeError) as e:
             last_err = e
