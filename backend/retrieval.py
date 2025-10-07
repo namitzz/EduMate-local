@@ -71,6 +71,25 @@ class Retriever:
             r["score"] = r["bm25"] * config.BM25_WEIGHT
 
         dedup.sort(key=lambda x: x["score"], reverse=True)
-        return dedup[: config.TOP_K]
+        results = dedup[: config.TOP_K]
+        
+        # In Fast Mode, trim context to MAX_CONTEXT_CHARS
+        if config.FAST_MODE and config.MAX_CONTEXT_CHARS:
+            total_chars = 0
+            trimmed_results = []
+            for r in results:
+                doc_len = len(r["doc"])
+                if total_chars + doc_len <= config.MAX_CONTEXT_CHARS:
+                    trimmed_results.append(r)
+                    total_chars += doc_len
+                elif total_chars < config.MAX_CONTEXT_CHARS:
+                    # Partial include to reach limit
+                    remaining = config.MAX_CONTEXT_CHARS - total_chars
+                    r["doc"] = r["doc"][:remaining]
+                    trimmed_results.append(r)
+                    break
+            return trimmed_results
+        
+        return results
 
 

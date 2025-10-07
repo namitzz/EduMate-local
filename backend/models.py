@@ -1,4 +1,6 @@
 import os, requests, json, time
+import aiohttp
+from typing import AsyncGenerator
 import config
 
 def ollama_complete(prompt: str, model: str | None = None) -> str:
@@ -29,4 +31,48 @@ def ollama_complete(prompt: str, model: str | None = None) -> str:
             last_err = e
             time.sleep(2 + 2*attempt)  # backoff: 2s, 4s, 6s
     raise RuntimeError(f"Ollama call failed after retries: {last_err}")
+
+
+async def ollama_complete_stream(prompt: str, model: str | None = None) -> AsyncGenerator[str, None]:
+    """
+    Stream tokens from Ollama using /api/chat endpoint.
+    Yields text deltas as they arrive.
+    """
+    url = (config.OLLAMA_HOST or os.getenv("OLLAMA_HOST") or "http://host.docker.internal:11434").rstrip("/")
+    model = model or config.OLLAMA_MODEL
+    
+    # Use chat format for streaming
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": True,
+        "options": {"temperature": config.TEMPERATURE, "num_predict": config.MAX_TOKENS},
+        "keep_alive": "2h",
+    }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{url}/api/chat",
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=180)
+            ) as response:
+                response.raise_for_status()
+                
+                async for line in response.content:
+                    if line:
+                        try:
+                            data = json.loads(line.decode('utf-8'))
+                            if "message" in data and "content" in data["message"]:
+                                delta = data["message"]["content"]
+                                if delta:
+                                    yield delta
+                            # Check if done
+                            if data.get("done", False):
+                                break
+                        except json.JSONDecodeError:
+                            continue
+    except Exception as e:
+        print(f"[ERROR] Streaming error: {e}")
+        yield f"[Streaming error: {e}]"
 

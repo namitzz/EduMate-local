@@ -1,11 +1,14 @@
 from typing import List, Dict, Optional
 import re
+import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from models import ollama_complete
+from models import ollama_complete, ollama_complete_stream
 from retrieval import Retriever
+import config
 
 # --- FastAPI app ---
 app = FastAPI(title="EduMate Local API", version="0.1.0")
@@ -20,10 +23,18 @@ app.add_middleware(
 # Shared retriever (Chroma is already persisted)
 retriever = Retriever()
 
+# Semaphore for concurrency control
+generation_semaphore = asyncio.Semaphore(config.MAX_ACTIVE_GENERATIONS)
+
 
 # --- Schemas ---
 class ChatRequest(BaseModel):
     messages: List[Dict]
+
+
+class ChatStreamRequest(BaseModel):
+    messages: List[Dict]
+    mode: Optional[str] = "docs"  # docs, coach, or facts
 
 
 # --- Greeting detection ---
@@ -89,6 +100,86 @@ def compose_prompt(contexts: List[Dict], user_msg: str):
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+# --- Streaming Chat route (new, additive) ---
+@app.post("/chat_stream")
+async def chat_stream(req: ChatStreamRequest):
+    """
+    Streaming endpoint for Fast Mode and public UI.
+    Supports modes: docs (RAG), coach (study tips), facts (quick answers).
+    """
+    # Find the last user message
+    last_user: Optional[str] = ""
+    for m in reversed(req.messages):
+        if (m.get("role") or "").lower() == "user":
+            last_user = m.get("content", "")
+            break
+    if not last_user:
+        raise HTTPException(status_code=400, detail="No user message provided")
+
+    # Check if it's a greeting
+    if is_greeting_or_chitchat(last_user):
+        async def greeting_gen():
+            greeting = (
+                "Hello! I'm EduMate, your study assistant. "
+                "I'm here to help you with questions about your course materials. "
+                "What would you like to know?"
+            )
+            yield greeting
+        return StreamingResponse(greeting_gen(), media_type="text/plain")
+
+    # Build prompt based on mode
+    prompt = ""
+    mode = (req.mode or "docs").lower()
+    
+    if mode == "coach":
+        # Study coaching mode - no retrieval, general study advice
+        prompt = (
+            "You are EduMate, a supportive study coach. "
+            "Provide helpful, encouraging study advice and strategies. "
+            f"User question: {last_user}\n\nAnswer:"
+        )
+    elif mode == "facts":
+        # Quick facts mode - no retrieval, concise answers
+        prompt = (
+            "You are EduMate. Provide a brief, factual answer. "
+            f"Question: {last_user}\n\nAnswer:"
+        )
+    else:
+        # Default: docs mode with retrieval (RAG)
+        ctx = []
+        try:
+            ctx = retriever.retrieve(last_user, model_call=ollama_complete)
+        except Exception as e:
+            print("Retrieval error:", repr(e))
+
+        if not ctx:
+            async def no_context_gen():
+                yield ("I couldn't find that in the provided course materials. "
+                       "Please try rephrasing or ask about another section.")
+            return StreamingResponse(no_context_gen(), media_type="text/plain")
+
+        # Build prompt with context (same as /chat endpoint)
+        prompt, sources = compose_prompt(ctx, last_user)
+        
+        # In Fast Mode, replace last user message with full prompt
+        # (This allows the streaming to work with the full RAG context)
+        if config.FAST_MODE:
+            # Use the composed prompt directly
+            pass
+
+    # Stream generation with semaphore
+    async def generate_stream():
+        async with generation_semaphore:
+            try:
+                async for token in ollama_complete_stream(prompt):
+                    yield token
+            except Exception as e:
+                print(f"[ERROR] Stream generation failed: {e}")
+                yield f"\n\n[Error generating response: {e}]"
+
+    return StreamingResponse(generate_stream(), media_type="text/plain")
 
 
 # --- Chat route ---
