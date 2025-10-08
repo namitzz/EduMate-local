@@ -53,7 +53,25 @@ HYDE         = False    # keep off until everything is stable
 MULTI_QUERY  = False    # re-enable later for recall
 
 # -----------------------
-# LLM (Ollama)
+# LLM Provider Configuration
+# -----------------------
+# USE_OPENAI: Toggle between OpenRouter (cloud) and Ollama (local)
+#   - USE_OPENAI=1 → Use OpenRouter (OpenAI-compatible API)
+#   - USE_OPENAI=0 or unset → Use local Ollama (default)
+USE_OPENAI = os.getenv("USE_OPENAI", "0") == "1"
+
+# -----------------------
+# OpenRouter Configuration (USE_OPENAI=1)
+# -----------------------
+# OpenRouter is OpenAI-compatible, uses the OpenAI SDK
+# Set OPENAI_API_KEY environment variable with your OpenRouter API key
+# Base URL: https://openrouter.ai/api/v1
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "openai/gpt-3.5-turbo")
+
+# -----------------------
+# Ollama Configuration (USE_OPENAI=0)
 # -----------------------
 # OLLAMA_HOST Configuration Guide:
 # 
@@ -78,12 +96,15 @@ MULTI_QUERY  = False    # re-enable later for recall
 # then defaults to http://localhost:11434 for local development convenience.
 
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
-
 OLLAMA_HOST = os.getenv("OLLAMA_URL", os.getenv("OLLAMA_HOST", "http://localhost:11434"))
 
-# Validate OLLAMA_HOST is not empty
-if not OLLAMA_HOST:
-    raise ValueError("OLLAMA_HOST must be set. Set OLLAMA_HOST or OLLAMA_URL environment variable.")
+# Validate OLLAMA_HOST is not empty when using Ollama
+if not USE_OPENAI and not OLLAMA_HOST:
+    raise ValueError("OLLAMA_HOST must be set when USE_OPENAI=0. Set OLLAMA_HOST or OLLAMA_URL environment variable.")
+
+# Validate OpenAI API key when using OpenRouter
+if USE_OPENAI and not OPENAI_API_KEY:
+    raise ValueError("OPENAI_API_KEY must be set when USE_OPENAI=1. Get your key from https://openrouter.ai/keys")
 
 # Generation controls (balanced for quality and speed)
 # Reduced to 400 for faster responses (4-6 seconds target)
