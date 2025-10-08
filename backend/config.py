@@ -110,4 +110,15 @@ TEMPERATURE  = float(os.getenv("TEMP", "0.3"))
 # Concurrency control for Fast Mode pilot
 MAX_ACTIVE_GENERATIONS = int(os.getenv("MAX_ACTIVE_GENERATIONS", "1"))
 
+# -----------------------
+# Module Convenor Assistant Configuration
+# -----------------------
+# Session-based context tracking
+ENABLE_SESSION_MEMORY = os.getenv("ENABLE_SESSION_MEMORY", "1") == "1"
+MAX_SESSION_MESSAGES = int(os.getenv("MAX_SESSION_MESSAGES", "10"))
+
+# Module Convenor persona and style
+CONVENOR_NAME = os.getenv("CONVENOR_NAME", "Prof. Zeng")
+CONVENOR_STYLE = os.getenv("CONVENOR_STYLE", "friendly and supportive, like a dedicated module convenor")
+
 

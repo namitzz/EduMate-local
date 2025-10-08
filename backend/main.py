@@ -9,6 +9,12 @@ from pydantic import BaseModel
 
 from models import ollama_complete, ollama_complete_stream
 from retrieval import Retriever
+from session_memory import session_memory
+from convenor_helper import (
+    AssignmentContextAnalyzer,
+    enhance_convenor_prompt,
+    get_convenor_system_prompt
+)
 import config
 
 
@@ -162,11 +168,14 @@ generation_semaphore = asyncio.Semaphore(config.MAX_ACTIVE_GENERATIONS)
 # --- Schemas ---
 class ChatRequest(BaseModel):
     messages: List[Dict]
+    session_id: Optional[str] = None  # For session-based memory
+    mode: Optional[str] = "docs"  # docs, coach, facts, or convenor
 
 
 class ChatStreamRequest(BaseModel):
     messages: List[Dict]
-    mode: Optional[str] = "docs"  # docs, coach, or facts
+    mode: Optional[str] = "docs"  # docs, coach, facts, or convenor
+    session_id: Optional[str] = None  # For session-based memory
 
 
 # --- Greeting detection ---
@@ -201,11 +210,17 @@ def is_greeting_or_chitchat(msg: str) -> bool:
 
 
 # --- Prompt builder ---
-def compose_prompt(contexts: List[Dict], user_msg: str):
+def compose_prompt(contexts: List[Dict], user_msg: str, use_convenor_style: bool = False, session_context: str = ""):
     """
     Build a grounded prompt from retrieved contexts with inline citation markers.
     Returns (prompt_str, sources_list).
     Optimized for faster generation.
+    
+    Args:
+        contexts: Retrieved document contexts
+        user_msg: User's question
+        use_convenor_style: Whether to use Module Convenor personality
+        session_context: Previous conversation context
     """
     # Limit to top 3 chunks in fast mode, trim each to avoid huge prompts
     max_contexts = 3 if config.FAST_MODE else 4
@@ -222,20 +237,35 @@ def compose_prompt(contexts: List[Dict], user_msg: str):
         meta = c.get("meta") or {}
         sources.append(f"{marker} {meta.get('file')} (chunk {meta.get('chunk')})")
 
-    # More concise system prompt for faster generation
-    system = (
-        "You are EduMate, a study assistant. Answer based on the context provided. "
-        "Be clear and concise. Use citation markers [①, ②, ...] for sources. "
-        "If the answer isn't in the context, say so briefly."
-    )
+    # Choose system prompt based on style
+    if use_convenor_style:
+        system = get_convenor_system_prompt()
+        # Add guidance context
+        guidance_context = AssignmentContextAnalyzer.get_guidance_context(user_msg)
+        if guidance_context:
+            system += f"\n\n{guidance_context}"
+    else:
+        # Original concise system prompt
+        system = (
+            "You are EduMate, a study assistant. Answer based on the context provided. "
+            "Be clear and concise. Use citation markers [①, ②, ...] for sources. "
+            "If the answer isn't in the context, say so briefly."
+        )
 
     context_block = "\n".join(ctx_text) if ctx_text else "(no context)"
-    prompt = (
-        system
-        + "\n\nContext:\n" + context_block
-        + "\n\nQuestion: " + user_msg
-        + "\n\nAnswer:"
-    )
+    
+    # Add session context if available
+    prompt_parts = [system]
+    if session_context:
+        prompt_parts.append(session_context)
+    
+    prompt_parts.extend([
+        "\n\nContext:\n" + context_block,
+        "\n\nQuestion: " + user_msg,
+        "\n\nAnswer:"
+    ])
+    
+    prompt = "".join(prompt_parts)
     return prompt, sources
 
 
@@ -250,8 +280,11 @@ def health():
 async def chat_stream(req: ChatStreamRequest):
     """
     Streaming endpoint for Fast Mode and public UI.
-    Supports modes: docs (RAG), coach (study tips), facts (quick answers).
+    Supports modes: docs (RAG), coach (study tips), facts (quick answers), convenor (academic guidance).
     """
+    # Extract session ID for memory tracking
+    session_id = req.session_id or "default"
+    
     # Find the last user message
     last_user: Optional[str] = ""
     for m in reversed(req.messages):
@@ -261,14 +294,19 @@ async def chat_stream(req: ChatStreamRequest):
     if not last_user:
         raise HTTPException(status_code=400, detail="No user message provided")
 
+    # Add user message to session memory
+    session_memory.add_message(session_id, "user", last_user)
+
     # Check if it's a greeting
     if is_greeting_or_chitchat(last_user):
         async def greeting_gen():
             greeting = (
-                "Hello! I'm EduMate, your study assistant. "
-                "I'm here to help you with questions about your course materials. "
-                "What would you like to know?"
+                f"Hello! I'm EduMate, your AI Module Convenor Assistant inspired by {config.CONVENOR_NAME}. "
+                "I'm here to provide personalized academic guidance and support with your coursework. "
+                "How can I help you today?"
             )
+            # Save assistant response to memory
+            session_memory.add_message(session_id, "assistant", greeting)
             yield greeting
         return StreamingResponse(greeting_gen(), media_type="text/plain")
 
@@ -276,10 +314,47 @@ async def chat_stream(req: ChatStreamRequest):
     prompt = ""
     mode = (req.mode or "docs").lower()
     
-    if mode == "coach":
+    if mode == "convenor":
+        # Module Convenor mode - intelligent academic guidance with RAG
+        ctx = []
+        retrieval_error = None
+        try:
+            ctx = retriever.retrieve(last_user, model_call=ollama_complete)
+        except Exception as e:
+            retrieval_error = e
+            print(f"[ERROR] Retrieval error: {repr(e)}")
+
+        # Handle retrieval failure
+        if retrieval_error:
+            async def retrieval_error_gen():
+                error_msg = get_error_message(ErrorType.RETRIEVAL_ERROR, error_details=str(retrieval_error))
+                session_memory.add_message(session_id, "assistant", error_msg)
+                yield error_msg
+            return StreamingResponse(retrieval_error_gen(), media_type="text/plain")
+
+        # Get session context
+        session_context = session_memory.get_context_summary(session_id)
+        
+        # Build prompt with convenor style
+        if ctx:
+            prompt, sources = compose_prompt(ctx, last_user, use_convenor_style=True, session_context=session_context)
+        else:
+            # No context found, but still provide convenor-style guidance
+            guidance_context = AssignmentContextAnalyzer.get_guidance_context(last_user)
+            prompt = (
+                get_convenor_system_prompt() + "\n\n"
+                + (session_context if session_context else "")
+                + (guidance_context + "\n" if guidance_context else "")
+                + f"Question: {last_user}\n\n"
+                + "Note: I don't have specific course materials on this topic in my knowledge base. "
+                + "I'll provide general academic guidance based on my understanding.\n\nAnswer:"
+            )
+    
+    elif mode == "coach":
         # Study coaching mode - no retrieval, general study advice
         prompt = (
-            "You are EduMate, a study coach. Provide helpful, encouraging study advice. "
+            f"You are EduMate, a study coach inspired by {config.CONVENOR_NAME}. "
+            "Provide helpful, encouraging study advice. "
             "Be concise and practical.\n\n"
             f"Question: {last_user}\n\nAnswer:"
         )
@@ -302,17 +377,21 @@ async def chat_stream(req: ChatStreamRequest):
         # Handle retrieval failure
         if retrieval_error:
             async def retrieval_error_gen():
-                yield get_error_message(ErrorType.RETRIEVAL_ERROR, error_details=str(retrieval_error))
+                error_msg = get_error_message(ErrorType.RETRIEVAL_ERROR, error_details=str(retrieval_error))
+                session_memory.add_message(session_id, "assistant", error_msg)
+                yield error_msg
             return StreamingResponse(retrieval_error_gen(), media_type="text/plain")
 
         # Handle no context found
         if not ctx:
             async def no_context_gen():
-                yield get_error_message(ErrorType.NO_CONTEXT)
+                error_msg = get_error_message(ErrorType.NO_CONTEXT)
+                session_memory.add_message(session_id, "assistant", error_msg)
+                yield error_msg
             return StreamingResponse(no_context_gen(), media_type="text/plain")
 
-        # Build prompt with context (same as /chat endpoint)
-        prompt, sources = compose_prompt(ctx, last_user)
+        # Build prompt with context (standard style)
+        prompt, sources = compose_prompt(ctx, last_user, use_convenor_style=False)
         
         # In Fast Mode, replace last user message with full prompt
         # (This allows the streaming to work with the full RAG context)
@@ -322,10 +401,17 @@ async def chat_stream(req: ChatStreamRequest):
 
     # Stream generation with semaphore and improved error handling
     async def generate_stream():
+        response_text = ""
         async with generation_semaphore:
             try:
                 async for token in ollama_complete_stream(prompt):
+                    response_text += token
                     yield token
+                
+                # Save complete response to memory
+                if response_text:
+                    session_memory.add_message(session_id, "assistant", response_text)
+                    
             except Exception as e:
                 error_str = str(e)
                 print(f"[ERROR] Stream generation failed: {repr(e)}")
@@ -338,7 +424,9 @@ async def chat_stream(req: ChatStreamRequest):
                 else:
                     error_type = ErrorType.MODEL_ERROR
                 
-                yield f"\n\n{get_error_message(error_type, error_details=error_str)}"
+                error_msg = f"\n\n{get_error_message(error_type, error_details=error_str)}"
+                session_memory.add_message(session_id, "assistant", error_msg)
+                yield error_msg
 
     return StreamingResponse(generate_stream(), media_type="text/plain")
 
@@ -346,6 +434,14 @@ async def chat_stream(req: ChatStreamRequest):
 # --- Chat route ---
 @app.post("/chat")
 def chat(req: ChatRequest):
+    """
+    Non-streaming chat endpoint.
+    Supports modes: docs (RAG), coach (study tips), facts (quick answers), convenor (academic guidance).
+    """
+    # Extract session ID for memory tracking
+    session_id = req.session_id or "default"
+    mode = (req.mode or "docs").lower()
+    
     # find the last user message
     last_user: Optional[str] = ""
     for m in reversed(req.messages):
@@ -355,54 +451,114 @@ def chat(req: ChatRequest):
     if not last_user:
         raise HTTPException(status_code=400, detail="No user message provided")
 
+    # Add user message to session memory
+    session_memory.add_message(session_id, "user", last_user)
+
     # Check if it's a greeting or chitchat
     if is_greeting_or_chitchat(last_user):
         greeting_response = (
-            "Hello! I'm EduMate, your study assistant. "
-            "I'm here to help you with questions about your course materials. "
-            "What would you like to know?"
+            f"Hello! I'm EduMate, your AI Module Convenor Assistant inspired by {config.CONVENOR_NAME}. "
+            "I'm here to provide personalized academic guidance and support with your coursework. "
+            "How can I help you today?"
         )
+        session_memory.add_message(session_id, "assistant", greeting_response)
         return {"answer": greeting_response, "sources": []}
 
-    # retrieve context with improved error handling
-    ctx = []
-    retrieval_error = None
-    try:
-        ctx = retriever.retrieve(last_user, model_call=ollama_complete)
-    except Exception as e:
-        retrieval_error = e
-        print(f"[ERROR] Retrieval error: {repr(e)}")
+    # Handle different modes
+    sources = []
+    
+    if mode == "convenor":
+        # Module Convenor mode - intelligent academic guidance with RAG
+        ctx = []
+        retrieval_error = None
+        try:
+            ctx = retriever.retrieve(last_user, model_call=ollama_complete)
+        except Exception as e:
+            retrieval_error = e
+            print(f"[ERROR] Retrieval error: {repr(e)}")
 
-    # Handle retrieval failure
-    if retrieval_error:
-        error_msg = get_error_message(ErrorType.RETRIEVAL_ERROR, error_details=str(retrieval_error))
-        return {"answer": error_msg, "sources": []}
+        # Handle retrieval failure
+        if retrieval_error:
+            error_msg = get_error_message(ErrorType.RETRIEVAL_ERROR, error_details=str(retrieval_error))
+            session_memory.add_message(session_id, "assistant", error_msg)
+            return {"answer": error_msg, "sources": []}
 
-    # Handle no context found
-    if not ctx:
-        error_msg = get_error_message(ErrorType.NO_CONTEXT)
-        return {"answer": error_msg, "sources": []}
+        # Get session context
+        session_context = session_memory.get_context_summary(session_id)
+        
+        # Build prompt with convenor style
+        if ctx:
+            prompt, sources = compose_prompt(ctx, last_user, use_convenor_style=True, session_context=session_context)
+        else:
+            # No context found, but still provide convenor-style guidance
+            guidance_context = AssignmentContextAnalyzer.get_guidance_context(last_user)
+            prompt = (
+                get_convenor_system_prompt() + "\n\n"
+                + (session_context if session_context else "")
+                + (guidance_context + "\n" if guidance_context else "")
+                + f"Question: {last_user}\n\n"
+                + "Note: I don't have specific course materials on this topic in my knowledge base. "
+                + "I'll provide general academic guidance based on my understanding.\n\nAnswer:"
+            )
+    
+    elif mode == "coach":
+        # Study coaching mode
+        prompt = (
+            f"You are EduMate, a study coach inspired by {config.CONVENOR_NAME}. "
+            "Provide helpful, encouraging study advice. Be concise and practical.\n\n"
+            f"Question: {last_user}\n\nAnswer:"
+        )
+    
+    elif mode == "facts":
+        # Quick facts mode
+        prompt = (
+            "You are EduMate. Provide a brief, factual answer.\n\n"
+            f"Question: {last_user}\n\nAnswer:"
+        )
+    
+    else:
+        # Default: docs mode with retrieval (RAG)
+        ctx = []
+        retrieval_error = None
+        try:
+            ctx = retriever.retrieve(last_user, model_call=ollama_complete)
+        except Exception as e:
+            retrieval_error = e
+            print(f"[ERROR] Retrieval error: {repr(e)}")
 
-    # build prompt
-    prompt, sources = compose_prompt(ctx, last_user)
+        # Handle retrieval failure
+        if retrieval_error:
+            error_msg = get_error_message(ErrorType.RETRIEVAL_ERROR, error_details=str(retrieval_error))
+            session_memory.add_message(session_id, "assistant", error_msg)
+            return {"answer": error_msg, "sources": []}
+
+        # Handle no context found
+        if not ctx:
+            error_msg = get_error_message(ErrorType.NO_CONTEXT)
+            session_memory.add_message(session_id, "assistant", error_msg)
+            return {"answer": error_msg, "sources": []}
+
+        # build prompt with standard style
+        prompt, sources = compose_prompt(ctx, last_user, use_convenor_style=False)
 
     # debug logs
     try:
-        print("\n[DEBUG] Retrieved context preview:",
-              [c["doc"][:120].replace("\n", " ") for c in ctx][:3])
+        print("\n[DEBUG] Mode:", mode)
+        if sources:
+            print("[DEBUG] Sources:", sources[:3])
         print("[DEBUG] Prompt head:", prompt[:300].replace("\n", " "))
     except Exception:
         pass
 
-    # call Ollama with improved error handling
+    # call LLM with improved error handling
     answer = ""
     error_type = None
     try:
         answer = ollama_complete(prompt)
-        print(f"[DEBUG] Ollama response length: {len(answer)} chars")
+        print(f"[DEBUG] LLM response length: {len(answer)} chars")
     except RuntimeError as e:
         error_str = str(e)
-        print(f"[ERROR] Ollama call error: {repr(e)}")
+        print(f"[ERROR] LLM call error: {repr(e)}")
         
         # Classify the error based on the exception message
         if "Empty response" in error_str:
@@ -415,18 +571,24 @@ def chat(req: ChatRequest):
             error_type = ErrorType.MODEL_ERROR
         
         error_msg = get_error_message(error_type, sources=sources, error_details=error_str)
+        session_memory.add_message(session_id, "assistant", error_msg)
         return {"answer": error_msg, "sources": sources}
     except Exception as e:
         # Catch-all for unexpected errors
-        print(f"[ERROR] Unexpected error during Ollama call: {repr(e)}")
+        print(f"[ERROR] Unexpected error during LLM call: {repr(e)}")
         error_msg = get_error_message(ErrorType.MODEL_ERROR, sources=sources, error_details=str(e))
+        session_memory.add_message(session_id, "assistant", error_msg)
         return {"answer": error_msg, "sources": sources}
 
     # Handle empty or invalid response
     if not answer or answer.strip() == "":
-        print("[WARNING] Ollama returned empty answer string")
+        print("[WARNING] LLM returned empty answer string")
         error_msg = get_error_message(ErrorType.MODEL_EMPTY_RESPONSE, sources=sources)
+        session_memory.add_message(session_id, "assistant", error_msg)
         return {"answer": error_msg, "sources": sources}
 
+    # Save successful response to memory
+    session_memory.add_message(session_id, "assistant", answer)
+    
     return {"answer": answer, "sources": sources}
 
