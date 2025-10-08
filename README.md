@@ -209,7 +209,7 @@ For detailed deployment instructions including cloud deployment and Fly.io free 
    cd backend
    fly launch
    # Follow prompts, set billing limit to $0
-   # Update frontend with: export API_BASE=https://your-app.fly.dev
+   # Update frontend with: export API_BASE=https://edumate-local.fly.dev
    ```
    See [DEPLOYMENT.md](DEPLOYMENT.md) for complete Fly.io instructions.
 

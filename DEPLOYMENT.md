@@ -243,7 +243,7 @@ Fly.io offers a generous free tier perfect for hosting the EduMate backend API a
    fly logs
    
    # Check health endpoint
-   curl https://your-app-name.fly.dev/health
+   curl https://edumate-local.fly.dev/health
    ```
 
 ### Important Notes for Free Tier
@@ -269,10 +269,10 @@ After deploying, update your Streamlit frontend to use the new API endpoint:
 
 ```bash
 # In ui/ directory
-export API_BASE=https://your-app-name.fly.dev
+export API_BASE=https://edumate-local.fly.dev
 
 # Or modify the code directly in app.py / app_simple.py / app_public.py:
-API_BASE = "https://your-app-name.fly.dev"
+API_BASE = "https://edumate-local.fly.dev"
 ```
 
 ### Monitoring Usage

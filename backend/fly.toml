@@ -12,7 +12,7 @@
 # To set spending limits: fly orgs billing-limits set
 # To check current usage: fly billing show
 
-app = "edumate-backend"
+app = "edumate-local"
 primary_region = "iad"  # Change to your nearest region (iad=US East, lhr=London, syd=Sydney)
 
 [build]
@@ -75,6 +75,6 @@ primary_region = "iad"  # Change to your nearest region (iad=US East, lhr=London
 #
 # UPDATING FRONTEND:
 # After deployment, update the API_BASE environment variable in your Streamlit
-# frontend to point to: https://your-app.fly.dev
-# Example: export API_BASE=https://edumate-backend.fly.dev
+# frontend to point to: https://edumate-local.fly.dev
+# Example: export API_BASE=https://edumate-local.fly.dev
 ##############################################################################
