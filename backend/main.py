@@ -51,6 +51,7 @@ def is_greeting_or_chitchat(msg: str) -> bool:
         # Comprehensive greeting patterns
         greeting_patterns = [
             r'^(hi|hello|hey|hii|hiii|heya|heyy|heyyy|howdy|greetings|sup|yo|hola|aloha|salut)([!.?,\s]*)?$',
+            r'^(hi|hello|hey)\s+(there|everyone|all)([!.?,\s]*)?$',
             r'^(good\s+(morning|afternoon|evening|day|night))([!.?,\s]*)?$',
             r'^(what\'?s?\s+up|wassup|whats\s+up|whatsup)([!.?,\s]*)?$',
             r'^(how\s+(are|r)\s+(you|u|ya))([!.?,\s]*)?$',
@@ -58,7 +59,6 @@ def is_greeting_or_chitchat(msg: str) -> bool:
             r'^(nice\s+to\s+meet\s+you)([!.?,\s]*)?$',
             r'^(thanks|thank\s+you|thx|ty)([!.?,\s]*)?$',
             r'^(bye|goodbye|see\s+ya|cya|later)([!.?,\s]*)?$',
-            r'^(hi\s+there|hello\s+there)([!.?,\s]*)?$',
         ]
         
         for pattern in greeting_patterns:
