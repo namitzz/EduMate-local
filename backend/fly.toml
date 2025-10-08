@@ -63,20 +63,24 @@ primary_region = "iad"  # Change to your nearest region (iad=US East, lhr=London
 #
 # 1. Install flyctl CLI: https://fly.io/docs/hands-on/install-flyctl/
 # 2. Login: fly auth login
-# 3. Deploy: fly launch (or fly deploy after first launch)
+# 3. Deploy: fly deploy (in backend directory)
 # 4. Check logs: fly logs
 # 5. Monitor usage: fly billing show
 # 6. Set spending cap: fly orgs billing-limits set
 #
 # IMPORTANT NOTES:
-# - This backend depends on Ollama for LLM generation, which is not included
-# - You may need to modify the code to use cloud LLM APIs (OpenAI, Anthropic)
-#   or remove Ollama dependency for cloud deployment
+# - This backend uses OpenRouter API (cloud LLM) - no local Ollama needed
+# - OpenRouter API key is pre-configured in config.py
 # - The ChromaDB vector database will be ephemeral (data lost on restart)
 # - For persistent storage, consider using external services or paid volumes
+# - Free tier includes 3 VMs with 256MB RAM each and 160GB transfer/month
 #
 # UPDATING FRONTEND:
-# After deployment, update the API_BASE environment variable in your Streamlit
-# frontend to point to: https://edumate-local.fly.dev
-# Example: export API_BASE=https://edumate-local.fly.dev
+# The Streamlit frontend at ui/app_simple.py is already configured to use:
+# API_BASE_URL = "https://edumate-local.fly.dev/"
+#
+# For Streamlit Cloud deployment:
+# - Point Streamlit Cloud to the main branch
+# - Set the main file path to: ui/app_simple.py
+# - No secrets needed - API URL is hardcoded in app_simple.py
 ##############################################################################
