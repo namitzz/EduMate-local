@@ -44,7 +44,9 @@ primary_region = "iad"  # Change to your nearest region (iad=US East, lhr=London
   PORT = "8000"
   FAST_MODE = "1"                    # Enable fast mode for better performance
   MAX_ACTIVE_GENERATIONS = "1"       # Limit concurrent requests on free tier
-  OLLAMA_MODEL = "mistral:latest"    # Note: Requires Ollama service (see docs)
+  USE_OPENAI = "1"                   # Use OpenRouter instead of Ollama
+  OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
+  OPENAI_MODEL = "openai/gpt-3.5-turbo"
 
 # ⚠️ NO PERSISTENT VOLUMES - Data will be ephemeral
 # For production with persistent data, you would need:

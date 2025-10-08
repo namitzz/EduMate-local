@@ -58,7 +58,7 @@ MULTI_QUERY  = False    # re-enable later for recall
 # USE_OPENAI: Toggle between OpenRouter (cloud) and Ollama (local)
 #   - USE_OPENAI=1 → Use OpenRouter (OpenAI-compatible API)
 #   - USE_OPENAI=0 or unset → Use local Ollama (default)
-USE_OPENAI = os.getenv("USE_OPENAI", "0") == "1"
+USE_OPENAI = os.getenv("USE_OPENAI", "1") == "1"
 
 # -----------------------
 # OpenRouter Configuration (USE_OPENAI=1)
@@ -66,7 +66,7 @@ USE_OPENAI = os.getenv("USE_OPENAI", "0") == "1"
 # OpenRouter is OpenAI-compatible, uses the OpenAI SDK
 # Set OPENAI_API_KEY environment variable with your OpenRouter API key
 # Base URL: https://openrouter.ai/api/v1
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "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")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "openai/gpt-3.5-turbo")
 
@@ -101,10 +101,6 @@ OLLAMA_HOST = os.getenv("OLLAMA_URL", os.getenv("OLLAMA_HOST", "http://localhost
 # Validate OLLAMA_HOST is not empty when using Ollama
 if not USE_OPENAI and not OLLAMA_HOST:
     raise ValueError("OLLAMA_HOST must be set when USE_OPENAI=0. Set OLLAMA_HOST or OLLAMA_URL environment variable.")
-
-# Validate OpenAI API key when using OpenRouter
-if USE_OPENAI and not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY must be set when USE_OPENAI=1. Get your key from https://openrouter.ai/keys")
 
 # Generation controls (balanced for quality and speed)
 # Reduced to 400 for faster responses (4-6 seconds target)
