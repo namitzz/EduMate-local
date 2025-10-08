@@ -75,13 +75,22 @@ See `backend/config.py`.
 ## Pilot Mode (Fast Mode + Public UI)
 
 ### Overview
-EduMate now includes an **opt-in Fast Mode** and a **public-friendly UI** designed for small pilots (6 students, zero cost). Fast Mode optimizes retrieval and generation for lower latency while the public UI provides a cleaner interface with streaming responses.
+EduMate includes an **optimized Fast Mode** and a **public-friendly UI** designed for rapid responses (4-6 seconds). Fast Mode is **enabled by default** and optimizes retrieval and generation for lower latency while the public UI provides a cleaner interface with streaming responses.
+
+### ✨ Recent Improvements
+- **⚡ 4-6 Second Responses**: Optimized for fast replies with Fast Mode enabled by default
+- **🎯 Enhanced Greeting Detection**: Responds to hi, hello, hey, and many greeting variations
+- **🔍 Fuzzy Synonym Matching**: Better understands synonyms and finds closest matches in course materials
+- **💫 Improved UI**: Cleaner design with better loading indicators and performance metrics
+- **📦 Deployment Ready**: Complete deployment guide for GitHub and cloud platforms
 
 ### Features
-- **Fast Mode**: Smaller chunks, fewer retrievals (top-k=3), context trimming for faster responses
+- **Fast Mode**: Enabled by default - smaller chunks, fewer retrievals (top-k=3), optimized context
+- **Smart Retrieval**: Fuzzy matching and synonym expansion for better results
 - **Public UI**: Clean interface with streaming, mode selector (Course Docs/Study Coach/Quick Facts)
 - **Evidence Mode**: Optional toggle to show when answers lack source citations
 - **Concurrency Control**: Semaphore-based limiting to prevent overload
+- **Performance Metrics**: Real-time response time tracking
 
 ### Quick Start (Fast Mode Enabled)
 
@@ -132,10 +141,21 @@ OLLAMA_MODEL=qwen2.5:1.5b-instruct  # or mistral:latest
 # Concurrency (1 = sequential, good for 6 students)
 MAX_ACTIVE_GENERATIONS=1
 
-# Generation settings
+# Generation settings (optimized for 4-6s responses)
 TEMP=0.3
-NUM_PREDICT=448
+NUM_PREDICT=400
 ```
+
+### Deployment
+
+For detailed deployment instructions including cloud deployment, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+Quick deployment with Docker:
+```bash
+docker compose up --build
+```
+
+Access at http://localhost:8501
 
 ### LAN Access for Students
 
@@ -164,16 +184,25 @@ To allow students on the same network to access EduMate:
 
 ### Performance Notes
 
-**With Fast Mode (`FAST_MODE=1`):**
+**With Fast Mode (enabled by default):**
 - Top-K reduced from 8 to 3 chunks
-- Context trimmed to 8000 chars max
+- Context trimmed to 6000 chars max (optimized)
+- MAX_TOKENS reduced to 400 for faster generation
 - Uses smaller embedding model (all-MiniLM-L6-v2)
-- First token typically arrives in 2-6 seconds
+- Enhanced fuzzy matching and synonym support
+- **Target: 4-6 seconds for first response**
+- First token typically arrives in 2-4 seconds
 
 **With small model (qwen2.5:1.5b-instruct):**
 - Significantly faster generation
 - Still coherent for course Q&A
 - Better for real-time pilot scenarios
+
+**Performance Tips:**
+- Greetings get instant responses (< 1s)
+- Use Fast Mode for optimal speed
+- Check logs for performance metrics
+- Reduce NUM_PREDICT if responses are still slow
 
 ### Rollback to Standard Mode
 

@@ -12,7 +12,8 @@ CORPUS_DIR = BASE_DIR / "corpus"      # Put your docs here inside the container
 # -----------------------
 # Fast Mode (env-guarded optimization)
 # -----------------------
-FAST_MODE = os.getenv("FAST_MODE", "0") == "1"
+# Enable Fast Mode by default for better performance
+FAST_MODE = os.getenv("FAST_MODE", "1") == "1"
 
 # -----------------------
 # Embeddings
@@ -27,11 +28,11 @@ else:
 # -----------------------
 # Chunking
 # -----------------------
-# Smaller chunks + overlap = better chance that headings stay with bullets
-# In Fast Mode, use even smaller chunks for speed
+# Optimized chunks for better retrieval and faster processing
+# In Fast Mode, use smaller chunks for speed
 if FAST_MODE:
-    CHUNK_SIZE = 750
-    CHUNK_OVERLAP = 100
+    CHUNK_SIZE = 600  # Smaller for faster embedding and retrieval
+    CHUNK_OVERLAP = 80
 else:
     CHUNK_SIZE = 600
     CHUNK_OVERLAP = 120
@@ -41,13 +42,13 @@ else:
 # -----------------------
 # In Fast Mode, retrieve fewer chunks for speed
 if FAST_MODE:
-    TOP_K = 3
-    MAX_CONTEXT_CHARS = 8000
+    TOP_K = 3  # Fewer chunks for faster processing
+    MAX_CONTEXT_CHARS = 6000  # Reduced for faster LLM processing
 else:
     TOP_K = 8
     MAX_CONTEXT_CHARS = None  # no limit
 
-BM25_WEIGHT  = 0.6      # boost for keyword overlap during re-rank (0..1)
+BM25_WEIGHT  = 0.7      # Increased boost for keyword overlap (fuzzy matching enhanced)
 HYDE         = False    # keep off until everything is stable
 MULTI_QUERY  = False    # re-enable later for recall
 
@@ -59,7 +60,8 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
 OLLAMA_HOST  = os.getenv("OLLAMA_URL", os.getenv("OLLAMA_HOST", "http://ollama:11434"))
 
 # Generation controls (balanced for quality and speed)
-MAX_TOKENS   = int(os.getenv("NUM_PREDICT", "800"))
+# Reduced to 400 for faster responses (4-6 seconds target)
+MAX_TOKENS   = int(os.getenv("NUM_PREDICT", "400"))
 TEMPERATURE  = float(os.getenv("TEMP", "0.3"))
 
 # Concurrency control for Fast Mode pilot
