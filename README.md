@@ -109,7 +109,21 @@ docker compose down
 - Streamlit shows answers with inline citations and a sources panel
 
 ## Config
-See `backend/config.py`.
+See `backend/config.py` for detailed configuration options.
+
+### Ollama Connection Configuration
+
+EduMate requires an Ollama instance for LLM generation. Configure based on your deployment:
+
+- **Local Development**: Uses `http://localhost:11434` by default
+- **Docker**: Configured automatically to `http://ollama:11434` in docker-compose.yml
+- **Cloud/Public API** (Fly.io, Streamlit Cloud, etc.): Set `OLLAMA_HOST` or `OLLAMA_URL` to your public Ollama endpoint
+  ```bash
+  export OLLAMA_HOST=https://your-ollama-api.com
+  ```
+  ⚠️ **Do NOT use localhost in cloud deployments** - it won't work
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed cloud configuration instructions.
 
 ## Pilot Mode (Fast Mode + Public UI)
 

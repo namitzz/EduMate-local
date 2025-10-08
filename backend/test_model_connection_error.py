@@ -12,17 +12,20 @@ def test_model_connection_error_message():
     sys.path.insert(0, os.path.dirname(__file__))
     
     # We'll test the message format directly without importing modules that need network
-    # This simulates the exact message from main.py:64-75
+    # This simulates the exact message from main.py:64-85
     message = (
         "Unable to connect to the AI model (Ollama).\n\n"
         "**Possible causes:**\n"
         "• Ollama service is not running\n"
-        "• Connection to Ollama was refused\n\n"
+        "• Connection to Ollama was refused\n"
+        "• Wrong OLLAMA_HOST configuration for your deployment type\n\n"
         "**What to do:**\n"
-        "• Check if Ollama is running: `ollama list`\n"
-        "• Start Ollama if needed\n"
-        "• Verify OLLAMA_HOST configuration\n"
-        "• If using Docker, ensure the ollama container is running"
+        "• For local development: Ensure Ollama is running (`ollama list`)\n"
+        "• For Docker: Verify the ollama container is running\n"
+        "• For cloud/public API: Check OLLAMA_HOST is set to your public endpoint\n"
+        "  (e.g., https://api.ollama.ai, NOT localhost)\n"
+        "• Verify OLLAMA_HOST/OLLAMA_URL environment variable is correct\n"
+        "• Check if your API endpoint requires authentication"
     )
     
     print("=" * 60)
@@ -48,9 +51,11 @@ def test_model_connection_error_message():
     # Test 5: Contains key troubleshooting steps
     required_steps = [
         "ollama list",
-        "Start Ollama",
         "OLLAMA_HOST",
-        "Docker"
+        "Docker",
+        "cloud",
+        "public API",
+        "authentication"
     ]
     for step in required_steps:
         assert step in message, f"Should mention '{step}'"
@@ -82,9 +87,9 @@ def test_model_connection_error_message():
     print("✓ Contains all expected sections")
     
     # Test 8: Line count validation
-    # Should have at least 10 lines (title + blank + causes header + 2 causes + blank + 
-    #                                 what to do header + 4 actions)
-    assert len(lines) >= 10, f"Should have at least 10 lines, found {len(lines)}"
+    # Should have at least 13 lines (title + blank + causes header + 3 causes + blank + 
+    #                                 what to do header + 6 actions)
+    assert len(lines) >= 13, f"Should have at least 13 lines, found {len(lines)}"
     print(f"✓ Has proper line structure ({len(lines)} lines total)")
     
     # Display the message
