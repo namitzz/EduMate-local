@@ -285,5 +285,35 @@ The `/chat` endpoint remains unchanged and works exactly as before.
 2. **💡 Study Coach** (coach): General study tips without retrieval
 3. **⚡ Quick Facts** (facts): Concise factual answers without retrieval
 
+## Troubleshooting & Error Handling
+
+EduMate now provides **specific, actionable error messages** when issues occur. Instead of generic errors, you'll see detailed guidance for:
+
+- **No relevant documents found**: Suggestions to rephrase or check ingested content
+- **Retrieval errors**: Steps to initialize the vector database
+- **Ollama connection issues**: Instructions to start/verify Ollama
+- **Timeouts**: Tips for model optimization
+- **Empty responses**: Recovery steps and retry suggestions
+
+**For detailed troubleshooting:**
+- See [ERROR_HANDLING.md](ERROR_HANDLING.md) for complete error documentation
+- See [TESTING_ERROR_HANDLING.md](TESTING_ERROR_HANDLING.md) for manual testing guide
+- Check backend logs for detailed debugging information
+
+**Quick fixes:**
+```bash
+# Reinitialize vector database
+cd backend
+rm -rf chroma_db/
+python ingest.py
+
+# Verify Ollama is running
+ollama list
+ollama serve  # if not running
+
+# Check API health
+curl http://localhost:8000/health
+```
+
 
 
