@@ -87,7 +87,7 @@ fly status
 fly logs
 
 # Test the health endpoint
-curl https://your-app-name.fly.dev/health
+curl https://edumate-local.fly.dev/health
 
 # Expected response:
 # {"ok": true}
@@ -100,7 +100,7 @@ After deployment, update your Streamlit frontend to use the new API endpoint:
 **Option A: Environment Variable (Recommended)**
 ```bash
 # In your ui/ directory or deployment environment
-export API_BASE=https://your-app-name.fly.dev
+export API_BASE=https://edumate-local.fly.dev
 
 # Then run your Streamlit app
 streamlit run app_simple.py
@@ -111,7 +111,7 @@ Edit the UI files directly:
 
 ```python
 # In ui/app.py, ui/app_simple.py, or ui/app_public.py
-API_BASE = "https://your-app-name.fly.dev"
+API_BASE = "https://edumate-local.fly.dev"
 ```
 
 ## Important Notes
