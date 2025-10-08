@@ -107,5 +107,5 @@ async def ollama_complete_stream(prompt: str, model: str | None = None) -> Async
                             continue
     except Exception as e:
         print(f"[ERROR] Streaming error from {url}: {e}")
-        yield f"[Streaming error: {e}]"
+        yield f"[Streaming error (URL: {url}): {e}]"
 
