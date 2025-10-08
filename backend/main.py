@@ -2,13 +2,15 @@ from typing import List, Dict, Optional
 import re
 import asyncio
 from enum import Enum
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from models import ollama_complete, ollama_complete_stream
 from retrieval import Retriever
+from memory import get_memory
+from persona import compose_convenor_prompt, InteractionIntent, ModuleConvenorPersona
 import config
 
 
@@ -162,11 +164,13 @@ generation_semaphore = asyncio.Semaphore(config.MAX_ACTIVE_GENERATIONS)
 # --- Schemas ---
 class ChatRequest(BaseModel):
     messages: List[Dict]
+    session_id: Optional[str] = None  # For conversation memory
 
 
 class ChatStreamRequest(BaseModel):
     messages: List[Dict]
     mode: Optional[str] = "docs"  # docs, coach, or facts
+    session_id: Optional[str] = None  # For conversation memory
 
 
 # --- Greeting detection ---
@@ -201,48 +205,55 @@ def is_greeting_or_chitchat(msg: str) -> bool:
 
 
 # --- Prompt builder ---
-def compose_prompt(contexts: List[Dict], user_msg: str):
+def compose_prompt(contexts: List[Dict], user_msg: str, session_id: Optional[str] = None):
     """
     Build a grounded prompt from retrieved contexts with inline citation markers.
-    Returns (prompt_str, sources_list).
-    Optimized for faster generation.
+    Enhanced with Module Convenor persona for intelligent academic guidance.
+    Returns (prompt_str, sources_list, intent).
     """
-    # Limit to top 3 chunks in fast mode, trim each to avoid huge prompts
-    max_contexts = 3 if config.FAST_MODE else 4
-    contexts = contexts[:max_contexts]
-    sources, ctx_text = [], []
+    # Get conversation context if session_id provided
+    conversation_context = None
+    if session_id:
+        memory = get_memory()
+        conversation_context = memory.get_recent_context(session_id, num_messages=4)
     
-    # Reduce snippet size for faster processing
-    max_snippet_len = 800 if config.FAST_MODE else 1200
+    # Use enhanced Module Convenor prompting
+    prompt, sources, intent = compose_convenor_prompt(
+        contexts=contexts,
+        user_msg=user_msg,
+        conversation_context=conversation_context,
+        fast_mode=config.FAST_MODE
+    )
     
-    for i, c in enumerate(contexts, start=1):
-        marker = chr(9311 + i)  # ①, ②, ...
-        snippet = c["doc"][:max_snippet_len]
-        ctx_text.append(f"[{marker}] {snippet}")
-        meta = c.get("meta") or {}
-        sources.append(f"{marker} {meta.get('file')} (chunk {meta.get('chunk')})")
-
-    # More concise system prompt for faster generation
-    system = (
-        "You are EduMate, a study assistant. Answer based on the context provided. "
-        "Be clear and concise. Use citation markers [①, ②, ...] for sources. "
-        "If the answer isn't in the context, say so briefly."
-    )
-
-    context_block = "\n".join(ctx_text) if ctx_text else "(no context)"
-    prompt = (
-        system
-        + "\n\nContext:\n" + context_block
-        + "\n\nQuestion: " + user_msg
-        + "\n\nAnswer:"
-    )
-    return prompt, sources
+    return prompt, sources, intent
 
 
 # --- Health route ---
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+# --- Memory management routes ---
+@app.get("/memory/{session_id}")
+def get_session_memory(session_id: str):
+    """Get conversation history for a session."""
+    memory = get_memory()
+    conversation = memory.get_conversation(session_id)
+    patterns = memory.detect_patterns(session_id)
+    return {
+        "session_id": session_id,
+        "conversation": conversation,
+        "patterns": patterns
+    }
+
+
+@app.delete("/memory/{session_id}")
+def clear_session_memory(session_id: str):
+    """Clear conversation history for a session."""
+    memory = get_memory()
+    memory.clear_session(session_id)
+    return {"status": "cleared", "session_id": session_id}
 
 
 # --- Streaming Chat route (new, additive) ---
@@ -265,9 +276,14 @@ async def chat_stream(req: ChatStreamRequest):
     if is_greeting_or_chitchat(last_user):
         async def greeting_gen():
             greeting = (
-                "Hello! I'm EduMate, your study assistant. "
-                "I'm here to help you with questions about your course materials. "
-                "What would you like to know?"
+                "Hello! I'm your AI Module Convenor Assistant. "
+                "I'm here to provide personalized academic guidance and support for your studies. "
+                "I can help you with:\n"
+                "• Understanding course concepts and theories\n"
+                "• Assignment guidance and feedback\n"
+                "• Exam preparation strategies\n"
+                "• Study planning and learning techniques\n\n"
+                "What would you like to work on today?"
             )
             yield greeting
         return StreamingResponse(greeting_gen(), media_type="text/plain")
@@ -311,21 +327,28 @@ async def chat_stream(req: ChatStreamRequest):
                 yield get_error_message(ErrorType.NO_CONTEXT)
             return StreamingResponse(no_context_gen(), media_type="text/plain")
 
-        # Build prompt with context (same as /chat endpoint)
-        prompt, sources = compose_prompt(ctx, last_user)
+        # Build prompt with enhanced Module Convenor context
+        prompt, sources, intent = compose_prompt(ctx, last_user, session_id=req.session_id)
         
-        # In Fast Mode, replace last user message with full prompt
-        # (This allows the streaming to work with the full RAG context)
-        if config.FAST_MODE:
-            # Use the composed prompt directly
-            pass
+        # Save user message to memory if session_id provided
+        if req.session_id:
+            memory = get_memory()
+            memory.add_message(req.session_id, "user", last_user, metadata={"intent": intent.value})
 
     # Stream generation with semaphore and improved error handling
     async def generate_stream():
+        full_response = ""
         async with generation_semaphore:
             try:
                 async for token in ollama_complete_stream(prompt):
+                    full_response += token
                     yield token
+                
+                # Save assistant response to memory if session_id provided
+                if req.session_id and mode == "docs":
+                    memory = get_memory()
+                    memory.add_message(req.session_id, "assistant", full_response, metadata={"sources": sources})
+                    
             except Exception as e:
                 error_str = str(e)
                 print(f"[ERROR] Stream generation failed: {repr(e)}")
@@ -358,9 +381,10 @@ def chat(req: ChatRequest):
     # Check if it's a greeting or chitchat
     if is_greeting_or_chitchat(last_user):
         greeting_response = (
-            "Hello! I'm EduMate, your study assistant. "
-            "I'm here to help you with questions about your course materials. "
-            "What would you like to know?"
+            "Hello! I'm your AI Module Convenor Assistant. "
+            "I'm here to provide personalized academic guidance and support for your studies. "
+            "I can help you with understanding concepts, assignment guidance, exam preparation, and study planning. "
+            "What would you like to work on today?"
         )
         return {"answer": greeting_response, "sources": []}
 
@@ -383,8 +407,13 @@ def chat(req: ChatRequest):
         error_msg = get_error_message(ErrorType.NO_CONTEXT)
         return {"answer": error_msg, "sources": []}
 
-    # build prompt
-    prompt, sources = compose_prompt(ctx, last_user)
+    # build prompt with Module Convenor persona
+    prompt, sources, intent = compose_prompt(ctx, last_user, session_id=req.session_id)
+    
+    # Save user message to memory if session_id provided
+    if req.session_id:
+        memory = get_memory()
+        memory.add_message(req.session_id, "user", last_user, metadata={"intent": intent.value})
 
     # debug logs
     try:
@@ -427,6 +456,11 @@ def chat(req: ChatRequest):
         print("[WARNING] Ollama returned empty answer string")
         error_msg = get_error_message(ErrorType.MODEL_EMPTY_RESPONSE, sources=sources)
         return {"answer": error_msg, "sources": sources}
+
+    # Save assistant response to memory if session_id provided
+    if req.session_id:
+        memory = get_memory()
+        memory.add_message(req.session_id, "assistant", answer, metadata={"sources": sources, "intent": intent.value})
 
     return {"answer": answer, "sources": sources}
 
