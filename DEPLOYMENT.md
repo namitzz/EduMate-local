@@ -182,6 +182,81 @@ jobs:
 
 Add secrets in GitHub: Settings → Secrets → Actions
 
+## Configuring Ollama Connection for Different Deployments
+
+EduMate needs to connect to an Ollama instance for LLM generation. The configuration differs based on where you're deploying:
+
+### Local Development
+
+For local development, Ollama runs on your machine:
+
+```bash
+# In .env file
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=mistral
+```
+
+**Verify it works:**
+```bash
+# Check Ollama is running
+ollama list
+
+# Test the connection
+curl http://localhost:11434/api/tags
+```
+
+### Docker Deployment
+
+For Docker Compose deployment, Ollama runs in a separate container:
+
+```yaml
+# docker-compose.yml (already configured)
+services:
+  api:
+    environment:
+      OLLAMA_HOST: http://ollama:11434  # Container-to-container networking
+```
+
+The `ollama` hostname automatically resolves to the Ollama container.
+
+### Cloud Deployment with Public/Shared Ollama API
+
+⚠️ **IMPORTANT**: For cloud deployments (Fly.io, Streamlit Cloud, Railway, etc.), you MUST set OLLAMA_HOST to a public endpoint - **localhost will NOT work**.
+
+**Option 1: Use a public Ollama API service**
+```bash
+# Set environment variable to your public Ollama endpoint
+export OLLAMA_HOST=https://api.ollama.ai
+# OR
+export OLLAMA_URL=https://your-ollama-provider.com
+
+# For Fly.io:
+fly secrets set OLLAMA_HOST=https://your-ollama-api.com
+
+# For Streamlit Cloud:
+# Add to your app's secrets in the Streamlit dashboard
+```
+
+**Option 2: Host Ollama separately and expose it publicly**
+```bash
+# Deploy Ollama on a separate server/instance
+# Then set OLLAMA_HOST to the public URL
+export OLLAMA_HOST=https://your-ollama-instance.com:11434
+```
+
+**Common Cloud Configuration Mistakes:**
+- ❌ `OLLAMA_HOST=http://localhost:11434` - Will NOT work in cloud (localhost refers to the app container)
+- ❌ `OLLAMA_HOST=http://ollama:11434` - Will NOT work in cloud (no container networking)
+- ✅ `OLLAMA_HOST=https://your-public-endpoint.com` - Correct for cloud deployments
+- ✅ `OLLAMA_HOST=https://api.ollama.ai` - Example of a public Ollama API
+
+**Troubleshooting Cloud Connections:**
+1. Check the logs for "Attempting to connect to Ollama at: [URL]"
+2. Verify the URL is accessible from your cloud environment
+3. Test the endpoint: `curl https://your-ollama-api.com/api/tags`
+4. Check if authentication/API keys are required
+5. Ensure HTTPS is used if required by the provider
+
 ## Deploy on Fly.io (Free Tier)
 
 Fly.io offers a generous free tier perfect for hosting the EduMate backend API at no cost.
@@ -253,6 +328,19 @@ Fly.io offers a generous free tier perfect for hosting the EduMate backend API a
 1. **No Ollama**: Fly.io's free tier cannot run Ollama alongside the API. You have two options:
    - **Option A**: Modify the backend to use cloud LLM APIs (OpenAI, Anthropic, etc.)
    - **Option B**: Use a separate Ollama instance and connect via network (requires paid hosting)
+   
+   **To use a public/shared Ollama API:**
+   ```bash
+   # Set the OLLAMA_HOST to your public Ollama API endpoint
+   fly secrets set OLLAMA_HOST=https://your-ollama-api.com
+   # OR
+   fly secrets set OLLAMA_URL=https://your-ollama-api.com
+   
+   # Important: Use the actual public endpoint URL, NOT localhost
+   # Examples:
+   # - https://api.ollama.ai (if using Ollama cloud service)
+   # - https://your-ollama-instance.fly.dev (if hosting Ollama separately)
+   ```
 
 2. **Ephemeral Storage**: The ChromaDB vector database will be reset on each deployment. For persistent storage:
    - Use Fly.io volumes (paid feature)

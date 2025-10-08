@@ -15,6 +15,7 @@ def ollama_complete(prompt: str, model: str | None = None) -> str:
     }
 
     print(f"[DEBUG] Attempting to connect to Ollama at: {url}")
+    print(f"[DEBUG] Using model: {model}")
     
     # Retry a couple of times to ride out cold-starts
     last_err = None
@@ -48,6 +49,10 @@ def ollama_complete(prompt: str, model: str | None = None) -> str:
     
     # Provide detailed error message based on error type
     print(f"[ERROR] Failed to connect to Ollama at {url} after {attempt + 1} retries")
+    print(f"[ERROR] Troubleshooting:")
+    print(f"[ERROR]   - For local: Ensure Ollama is running (http://localhost:11434)")
+    print(f"[ERROR]   - For Docker: Verify OLLAMA_HOST=http://ollama:11434")
+    print(f"[ERROR]   - For cloud: Set OLLAMA_HOST to your public API endpoint (NOT localhost)")
     if isinstance(last_err, requests.ReadTimeout):
         raise RuntimeError(f"Ollama ReadTimeout after {attempt + 1} retries (URL: {url}): {last_err}")
     elif isinstance(last_err, requests.ConnectionError):
@@ -67,6 +72,7 @@ async def ollama_complete_stream(prompt: str, model: str | None = None) -> Async
     model = model or config.OLLAMA_MODEL
     
     print(f"[DEBUG] Attempting to stream from Ollama at: {url}")
+    print(f"[DEBUG] Using model: {model}")
     
     # Use chat format for streaming
     payload = {
