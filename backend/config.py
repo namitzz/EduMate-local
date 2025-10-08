@@ -56,8 +56,17 @@ MULTI_QUERY  = False    # re-enable later for recall
 # LLM (Ollama)
 # -----------------------
 # docker-compose.yml sets OLLAMA_HOST to http://ollama:11434
+# For local (non-Docker) use, set OLLAMA_HOST=http://localhost:11434 in .env
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
-OLLAMA_HOST  = os.getenv("OLLAMA_URL", os.getenv("OLLAMA_HOST", "http://ollama:11434"))
+
+# Try OLLAMA_URL first (used in .env.example), then OLLAMA_HOST
+# Default to http://localhost:11434 for better local (non-Docker) experience
+# Docker deployments should set OLLAMA_HOST=http://ollama:11434 in docker-compose.yml
+OLLAMA_HOST = os.getenv("OLLAMA_URL", os.getenv("OLLAMA_HOST", "http://localhost:11434"))
+
+# Validate OLLAMA_HOST is not empty
+if not OLLAMA_HOST:
+    raise ValueError("OLLAMA_HOST must be set. Set OLLAMA_HOST or OLLAMA_URL environment variable.")
 
 # Generation controls (balanced for quality and speed)
 # Reduced to 400 for faster responses (4-6 seconds target)
