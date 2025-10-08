@@ -12,4 +12,8 @@ corpus/
 *.htm
 .ipynb_checkpoints/
 .git/
+fly.toml
+.dockerignore
+README.md
+test_improvements.py
 EQF

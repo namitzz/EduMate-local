@@ -156,6 +156,153 @@ jobs:
 
 Add secrets in GitHub: Settings → Secrets → Actions
 
+## Deploy on Fly.io (Free Tier)
+
+Fly.io offers a generous free tier perfect for hosting the EduMate backend API at no cost.
+
+### Prerequisites
+
+1. **Install Fly.io CLI**
+   ```bash
+   # macOS
+   brew install flyctl
+   
+   # Linux
+   curl -L https://fly.io/install.sh | sh
+   
+   # Windows
+   powershell -Command "iwr https://fly.io/install.ps1 -useb | iex"
+   ```
+
+2. **Sign up and login**
+   ```bash
+   fly auth signup  # Create account
+   # OR
+   fly auth login   # If you have an account
+   ```
+
+3. **Set spending limits (IMPORTANT)**
+   ```bash
+   fly orgs billing-limits set
+   # Set to $0 to ensure you're never charged
+   ```
+
+### Deployment Steps
+
+1. **Navigate to backend directory**
+   ```bash
+   cd backend
+   ```
+
+2. **Deploy to Fly.io**
+   ```bash
+   fly launch
+   # Follow the prompts:
+   # - Choose app name (e.g., edumate-backend-yourname)
+   # - Select region closest to your users
+   # - Do NOT add a PostgreSQL database (select No)
+   # - Do NOT add Redis (select No)
+   # - Deploy now? Yes
+   ```
+
+   Alternatively, use the existing fly.toml:
+   ```bash
+   # Edit app name in fly.toml if needed
+   fly deploy
+   ```
+
+3. **Verify deployment**
+   ```bash
+   fly status
+   fly logs
+   
+   # Check health endpoint
+   curl https://your-app-name.fly.dev/health
+   ```
+
+### Important Notes for Free Tier
+
+⚠️ **Limitations to be aware of:**
+
+1. **No Ollama**: Fly.io's free tier cannot run Ollama alongside the API. You have two options:
+   - **Option A**: Modify the backend to use cloud LLM APIs (OpenAI, Anthropic, etc.)
+   - **Option B**: Use a separate Ollama instance and connect via network (requires paid hosting)
+
+2. **Ephemeral Storage**: The ChromaDB vector database will be reset on each deployment. For persistent storage:
+   - Use Fly.io volumes (paid feature)
+   - Or use an external vector database service
+
+3. **Auto-scaling**: The free tier config includes:
+   - Auto-stop when idle (saves resources)
+   - Auto-start on requests (may have cold start delay)
+   - Single machine (no redundancy)
+
+### Update Frontend Configuration
+
+After deploying, update your Streamlit frontend to use the new API endpoint:
+
+```bash
+# In ui/ directory
+export API_BASE=https://your-app-name.fly.dev
+
+# Or modify the code directly in app.py / app_simple.py / app_public.py:
+API_BASE = "https://your-app-name.fly.dev"
+```
+
+### Monitoring Usage
+
+```bash
+# Check current usage
+fly billing show
+
+# View spending
+fly dashboard
+# Navigate to: Billing → Usage
+
+# Check logs
+fly logs
+
+# SSH into container (debugging)
+fly ssh console
+```
+
+### Cost Management
+
+To ensure you stay on the free tier:
+
+1. **Set billing limits**: `fly orgs billing-limits set` → Set to $0
+2. **Monitor usage**: Check dashboard weekly at https://fly.io/dashboard
+3. **Use auto-stop**: Already configured in fly.toml
+4. **Limit scale**: Keep min_machines_running = 0
+
+Free tier includes:
+- 3 shared-cpu-1x VMs (256MB RAM each)
+- 160GB outbound transfer/month
+- Enough for small-scale educational use (5-10 concurrent users)
+
+### Troubleshooting Fly.io
+
+**Issue: Deployment fails due to memory**
+```bash
+# The backend with all dependencies may exceed 256MB
+# Solution: Optimize dependencies or upgrade to 512MB (may incur small cost)
+fly scale memory 512
+```
+
+**Issue: App crashes or restarts**
+```bash
+# Check logs
+fly logs
+# Common issues: Out of memory, missing environment variables
+```
+
+**Issue: Cold starts are slow**
+```bash
+# Keep at least one machine running (uses free tier allocation)
+# Edit fly.toml:
+min_machines_running = 1
+```
+
 ## Performance Optimization
 
 ### For 4-6 Second Response Times
