@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="EduMate - A lightweight, local RAG chatbot for students using Streamlit, FastAPI, ChromaDB, and Ollama">
+    <title>EduMate - Local AI Study Assistant</title>
+    <style>
+        :root {
+            --primary-color: #FF4B4B;
+            --secondary-color: #0E1117;
+            --text-color: #262730;
+            --light-bg: #FAFAFA;
+            --card-bg: #FFFFFF;
+            --border-color: #E0E0E0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 60px 20px 40px;
+            color: white;
+        }
+
+        .logo {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .tagline {
+            font-size: 1.3rem;
+            opacity: 0.95;
+            margin-bottom: 30px;
+        }
+
+        .main-content {
+            background: var(--card-bg);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 50px;
+            margin-bottom: 30px;
+        }
+
+        .alert {
+            background: #FFF3CD;
+            border: 2px solid #FFC107;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .alert h2 {
+            color: #856404;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert p {
+            color: #856404;
+            margin: 0;
+            line-height: 1.8;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin: 40px 0;
+        }
+
+        .feature-card {
+            background: var(--light-bg);
+            border-radius: 12px;
+            padding: 25px;
+            border: 2px solid var(--border-color);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+        }
+
+        .feature-card h3 {
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+
+        .deployment-section {
+            background: var(--light-bg);
+            border-radius: 12px;
+            padding: 30px;
+            margin: 30px 0;
+        }
+
+        .deployment-section h2 {
+            color: var(--secondary-color);
+            margin-bottom: 20px;
+        }
+
+        .deployment-options {
+            display: grid;
+            gap: 20px;
+        }
+
+        .deployment-option {
+            background: var(--card-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .deployment-option h3 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .code-block {
+            background: var(--secondary-color);
+            color: #00FF00;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin: 30px 0;
+            justify-content: center;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s;
+            font-size: 1.1rem;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #E63946;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 75, 75, 0.3);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--primary-color);
+            border: 2px solid var(--primary-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin: 30px 0;
+        }
+
+        .tech-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px;
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: white;
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+
+            .tagline {
+                font-size: 1.1rem;
+            }
+
+            .main-content {
+                padding: 30px 20px;
+            }
+
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">🎓</div>
+            <h1>EduMate</h1>
+            <p class="tagline">Your Local AI-Powered Study Assistant</p>
+        </header>
+
+        <div class="main-content">
+            <div class="alert">
+                <h2>⚠️ Important Notice</h2>
+                <p>
+                    <strong>EduMate is a server-based application</strong> that runs on your local machine or a server. 
+                    GitHub Pages only hosts static websites and cannot run Streamlit applications. 
+                    To use EduMate, please follow the deployment instructions below.
+                </p>
+            </div>
+
+            <h2 style="text-align: center; margin-bottom: 30px; color: var(--secondary-color);">About EduMate</h2>
+            <p style="text-align: center; font-size: 1.1rem; margin-bottom: 40px;">
+                A lightweight, <strong>fully local</strong> RAG (Retrieval-Augmented Generation) chatbot designed for students. 
+                Answer questions using only your course materials, with no data sent to external servers.
+            </p>
+
+            <div class="features">
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>100% Local & Private</h3>
+                    <p>All processing happens on your machine. Your course materials never leave your computer.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Fast Responses</h3>
+                    <p>Optimized for 4-6 second response times with Fast Mode enabled by default.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">📚</div>
+                    <h3>Course-Focused</h3>
+                    <p>Only uses instructor-provided documents. No hallucinations from external knowledge.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🎨</div>
+                    <h3>Multiple Modes</h3>
+                    <p>Ask Course Docs, Study Coach, or Quick Facts - switch modes for different needs.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🐳</div>
+                    <h3>Easy Deployment</h3>
+                    <p>Single Docker command or simple Python setup. Works on Windows, Mac, and Linux.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <h3>Smart Retrieval</h3>
+                    <p>Hybrid search with BM25 and semantic matching for accurate answers.</p>
+                </div>
+            </div>
+
+            <h2 style="text-align: center; margin: 40px 0 20px; color: var(--secondary-color);">Tech Stack</h2>
+            <div class="tech-stack">
+                <span class="tech-badge">🐍 Python</span>
+                <span class="tech-badge">🎈 Streamlit</span>
+                <span class="tech-badge">⚡ FastAPI</span>
+                <span class="tech-badge">🗄️ ChromaDB</span>
+                <span class="tech-badge">🤖 Ollama</span>
+                <span class="tech-badge">🧠 SentenceTransformers</span>
+            </div>
+
+            <div class="deployment-section">
+                <h2>🚀 Quick Deployment Options</h2>
+                
+                <div class="deployment-options">
+                    <div class="deployment-option">
+                        <h3>🐳 Option 1: Docker (Recommended)</h3>
+                        <p>Easiest setup - everything runs in containers:</p>
+                        <div class="code-block">
+$ git clone https://github.com/namitzz/EduMate-local.git<br>
+$ cd EduMate-local<br>
+$ docker compose up --build
+                        </div>
+                        <p>Then open <strong>http://localhost:8501</strong> in your browser.</p>
+                    </div>
+
+                    <div class="deployment-option">
+                        <h3>🖥️ Option 2: Local Installation</h3>
+                        <p>For manual setup without Docker:</p>
+                        <div class="code-block">
+# Install Ollama first from https://ollama.com<br>
+$ ollama pull mistral<br><br>
+# Terminal 1 - Backend<br>
+$ cd backend<br>
+$ pip install -r requirements.txt<br>
+$ python ingest.py<br>
+$ uvicorn main:app --reload --port 8000<br><br>
+# Terminal 2 - Frontend<br>
+$ cd ui<br>
+$ pip install -r requirements.txt<br>
+$ streamlit run app_public.py
+                        </div>
+                    </div>
+
+                    <div class="deployment-option">
+                        <h3>☁️ Option 3: Cloud Deployment</h3>
+                        <p>Deploy to DigitalOcean, AWS, or any VM with Docker:</p>
+                        <ol style="margin-left: 20px; margin-top: 10px;">
+                            <li>Create a VM with 4GB+ RAM and Ubuntu 22.04</li>
+                            <li>Install Docker and clone the repository</li>
+                            <li>Run <code>docker compose up -d</code></li>
+                            <li>Configure reverse proxy for HTTPS (optional)</li>
+                        </ol>
+                        <p style="margin-top: 10px;">See <a href="https://github.com/namitzz/EduMate-local/blob/main/DEPLOYMENT.md" style="color: var(--primary-color);">DEPLOYMENT.md</a> for detailed instructions.</p>
+                    </div>
+
+                    <div class="deployment-option">
+                        <h3>🌐 Option 4: Streamlit Cloud (Free)</h3>
+                        <p>Deploy your Streamlit app for free:</p>
+                        <ol style="margin-left: 20px; margin-top: 10px;">
+                            <li>Fork this repository</li>
+                            <li>Sign up at <a href="https://streamlit.io/cloud" style="color: var(--primary-color);">streamlit.io/cloud</a></li>
+                            <li>Deploy directly from your GitHub fork</li>
+                            <li>Configure environment variables</li>
+                        </ol>
+                        <p style="margin-top: 10px;"><strong>Note:</strong> You'll need to deploy the backend separately or use a cloud LLM API.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <a href="https://github.com/namitzz/EduMate-local" class="btn btn-primary">
+                    📦 View on GitHub
+                </a>
+                <a href="https://github.com/namitzz/EduMate-local/blob/main/README.md" class="btn btn-secondary">
+                    📖 Read Documentation
+                </a>
+                <a href="https://github.com/namitzz/EduMate-local/blob/main/DEPLOYMENT.md" class="btn btn-secondary">
+                    🚀 Deployment Guide
+                </a>
+            </div>
+
+            <div style="margin-top: 40px; padding: 20px; background: var(--light-bg); border-radius: 8px;">
+                <h3 style="color: var(--secondary-color); margin-bottom: 15px;">📋 Key Features</h3>
+                <ul style="margin-left: 20px; line-height: 2;">
+                    <li><strong>No Internet Required:</strong> Runs completely offline once set up</li>
+                    <li><strong>No Uploads:</strong> Instructor pre-loads all documents</li>
+                    <li><strong>Source Citations:</strong> Shows which documents answers come from</li>
+                    <li><strong>Fast Mode:</strong> Optimized for 4-6 second responses</li>
+                    <li><strong>Multiple Modes:</strong> Course Docs, Study Coach, Quick Facts</li>
+                    <li><strong>LAN Access:</strong> Share with students on your network</li>
+                </ul>
+            </div>
+        </div>
+
+        <footer>
+            <p>
+                Built with ❤️ for students and educators | 
+                <a href="https://github.com/namitzz/EduMate-local">GitHub Repository</a> | 
+                <a href="https://github.com/namitzz/EduMate-local/issues">Report Issues</a>
+            </p>
+            <p style="margin-top: 10px; opacity: 0.8;">
+                EduMate © 2024 | Open Source Project
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
