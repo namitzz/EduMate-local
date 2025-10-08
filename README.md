@@ -187,12 +187,23 @@ NUM_PREDICT=400
 
 ### Deployment
 
-For detailed deployment instructions including cloud deployment, see [DEPLOYMENT.md](DEPLOYMENT.md).
+For detailed deployment instructions including cloud deployment and Fly.io free tier, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
-Quick deployment with Docker:
-```bash
-docker compose up --build
-```
+**Quick Options:**
+
+1. **Docker (Local/Server):**
+   ```bash
+   docker compose up --build
+   ```
+
+2. **Fly.io Free Tier (Cloud):**
+   ```bash
+   cd backend
+   fly launch
+   # Follow prompts, set billing limit to $0
+   # Update frontend with: export API_BASE=https://your-app.fly.dev
+   ```
+   See [DEPLOYMENT.md](DEPLOYMENT.md) for complete Fly.io instructions.
 
 Access at http://localhost:8501
 
