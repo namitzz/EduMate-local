@@ -25,12 +25,34 @@ def ollama_complete(prompt: str, model: str | None = None) -> str:
             if text:
                 return text
             # Log when we get empty response
-            print(f"[WARNING] Ollama returned empty response. Full data: {data}")
+            print(f"[WARNING] Ollama returned empty response on attempt {attempt + 1}/3. Full data: {data}")
             raise RuntimeError("Empty response from Ollama")
-        except (requests.ReadTimeout, requests.ConnectionError, requests.HTTPError, json.JSONDecodeError) as e:
+        except requests.ReadTimeout as e:
             last_err = e
+            print(f"[WARNING] Ollama ReadTimeout on attempt {attempt + 1}/3: {e}")
             time.sleep(2 + 2*attempt)  # backoff: 2s, 4s, 6s
-    raise RuntimeError(f"Ollama call failed after retries: {last_err}")
+        except requests.ConnectionError as e:
+            last_err = e
+            print(f"[WARNING] Ollama ConnectionError on attempt {attempt + 1}/3: {e}")
+            time.sleep(2 + 2*attempt)  # backoff: 2s, 4s, 6s
+        except requests.HTTPError as e:
+            last_err = e
+            print(f"[WARNING] Ollama HTTPError on attempt {attempt + 1}/3: {e}")
+            time.sleep(2 + 2*attempt)  # backoff: 2s, 4s, 6s
+        except json.JSONDecodeError as e:
+            last_err = e
+            print(f"[WARNING] Ollama JSONDecodeError on attempt {attempt + 1}/3: {e}")
+            time.sleep(2 + 2*attempt)  # backoff: 2s, 4s, 6s
+    
+    # Provide detailed error message based on error type
+    if isinstance(last_err, requests.ReadTimeout):
+        raise RuntimeError(f"Ollama ReadTimeout after {attempt + 1} retries: {last_err}")
+    elif isinstance(last_err, requests.ConnectionError):
+        raise RuntimeError(f"Ollama ConnectionError after {attempt + 1} retries: {last_err}")
+    elif isinstance(last_err, requests.HTTPError):
+        raise RuntimeError(f"Ollama HTTPError after {attempt + 1} retries: {last_err}")
+    else:
+        raise RuntimeError(f"Ollama call failed after {attempt + 1} retries: {last_err}")
 
 
 async def ollama_complete_stream(prompt: str, model: str | None = None) -> AsyncGenerator[str, None]:
