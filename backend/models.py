@@ -4,7 +4,7 @@ from typing import AsyncGenerator
 import config
 
 def ollama_complete(prompt: str, model: str | None = None) -> str:
-    url = (config.OLLAMA_HOST or os.getenv("OLLAMA_HOST") or "http://host.docker.internal:11434").rstrip("/")
+    url = config.OLLAMA_HOST.rstrip("/")
     model = model or config.OLLAMA_MODEL
     payload = {
         "model": model,
@@ -14,6 +14,8 @@ def ollama_complete(prompt: str, model: str | None = None) -> str:
         "keep_alive": "2h",
     }
 
+    print(f"[DEBUG] Attempting to connect to Ollama at: {url}")
+    
     # Retry a couple of times to ride out cold-starts
     last_err = None
     for attempt in range(3):
@@ -45,14 +47,15 @@ def ollama_complete(prompt: str, model: str | None = None) -> str:
             time.sleep(2 + 2*attempt)  # backoff: 2s, 4s, 6s
     
     # Provide detailed error message based on error type
+    print(f"[ERROR] Failed to connect to Ollama at {url} after {attempt + 1} retries")
     if isinstance(last_err, requests.ReadTimeout):
-        raise RuntimeError(f"Ollama ReadTimeout after {attempt + 1} retries: {last_err}")
+        raise RuntimeError(f"Ollama ReadTimeout after {attempt + 1} retries (URL: {url}): {last_err}")
     elif isinstance(last_err, requests.ConnectionError):
-        raise RuntimeError(f"Ollama ConnectionError after {attempt + 1} retries: {last_err}")
+        raise RuntimeError(f"Ollama ConnectionError after {attempt + 1} retries (URL: {url}): {last_err}")
     elif isinstance(last_err, requests.HTTPError):
-        raise RuntimeError(f"Ollama HTTPError after {attempt + 1} retries: {last_err}")
+        raise RuntimeError(f"Ollama HTTPError after {attempt + 1} retries (URL: {url}): {last_err}")
     else:
-        raise RuntimeError(f"Ollama call failed after {attempt + 1} retries: {last_err}")
+        raise RuntimeError(f"Ollama call failed after {attempt + 1} retries (URL: {url}): {last_err}")
 
 
 async def ollama_complete_stream(prompt: str, model: str | None = None) -> AsyncGenerator[str, None]:
@@ -60,8 +63,10 @@ async def ollama_complete_stream(prompt: str, model: str | None = None) -> Async
     Stream tokens from Ollama using /api/chat endpoint.
     Yields text deltas as they arrive.
     """
-    url = (config.OLLAMA_HOST or os.getenv("OLLAMA_HOST") or "http://host.docker.internal:11434").rstrip("/")
+    url = config.OLLAMA_HOST.rstrip("/")
     model = model or config.OLLAMA_MODEL
+    
+    print(f"[DEBUG] Attempting to stream from Ollama at: {url}")
     
     # Use chat format for streaming
     payload = {
