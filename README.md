@@ -30,10 +30,49 @@ uvicorn main:app --reload --port 8000
 cd ui
 python -m venv .venv && source .venv/Scripts/activate
 pip install -r requirements.txt
-streamlit run app.py
+# Choose one of these:
+streamlit run app_simple.py  # Simple, beginner-friendly UI (recommended for learning)
+# OR
+streamlit run app.py         # Original UI with sources panel
+# OR
+streamlit run app_public.py  # Advanced UI with streaming and modes
 ```
 
 Open http://localhost:8501. The bot answers only from your docs in `corpus/`.
+
+### UI Options
+
+EduMate provides three Streamlit interfaces:
+
+1. **`app_simple.py`** ⭐ - Simple, beginner-friendly interface (NEW!)
+   - ⭐ Best for learning and understanding the basics
+   - Clean chat UI with source citations
+   - API health monitoring in sidebar
+   - Clear chat history button
+   - Easy to read and modify (~180 lines)
+   - Comprehensive documentation with examples
+   - See [ui/INDEX.md](ui/INDEX.md) for complete documentation guide
+   - See [ui/README_SIMPLE.md](ui/README_SIMPLE.md) for details
+
+2. **`app.py`** - Original interface
+   - Basic RAG functionality
+   - Sources displayed in sidebar
+   - Good for general use
+
+3. **`app_public.py`** - Advanced production interface
+   - Streaming responses
+   - Three modes (docs/coach/facts)
+   - Custom styling
+   - Performance metrics
+   - Best for production deployments
+
+**Quick Start with Simple UI:**
+```bash
+cd ui
+streamlit run app_simple.py
+```
+
+**Documentation:** See [ui/INDEX.md](ui/INDEX.md) for the complete documentation index.
 
 ## Quick Start (Docker)
 
