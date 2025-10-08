@@ -1,6 +1,7 @@
 from typing import List, Dict, Optional
 import re
 import asyncio
+from enum import Enum
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -9,6 +10,124 @@ from pydantic import BaseModel
 from models import ollama_complete, ollama_complete_stream
 from retrieval import Retriever
 import config
+
+
+# --- Error Classification ---
+class ErrorType(Enum):
+    """Classification of different error types for better user feedback"""
+    NO_CONTEXT = "no_context"
+    RETRIEVAL_ERROR = "retrieval_error"
+    MODEL_CONNECTION = "model_connection"
+    MODEL_TIMEOUT = "model_timeout"
+    MODEL_EMPTY_RESPONSE = "model_empty_response"
+    MODEL_ERROR = "model_error"
+    UNKNOWN = "unknown"
+
+
+def get_error_message(error_type: ErrorType, sources: List[str] = None, error_details: str = None) -> str:
+    """
+    Generate user-friendly, actionable error messages based on error type.
+    
+    Args:
+        error_type: The type of error that occurred
+        sources: Optional list of sources that were found (for context-found-but-generation-failed cases)
+        error_details: Optional technical details for logging
+    
+    Returns:
+        A user-friendly error message with actionable guidance
+    """
+    if error_details:
+        print(f"[ERROR DETAILS] {error_type.value}: {error_details}")
+    
+    if error_type == ErrorType.NO_CONTEXT:
+        return (
+            "I couldn't find relevant information in the course materials for your question.\n\n"
+            "**Suggestions:**\n"
+            "• Try rephrasing your question with different keywords\n"
+            "• Ask about topics that are covered in the uploaded documents\n"
+            "• Check if documents have been ingested (run `python ingest.py`)\n"
+            "• Make your question more specific to the course content"
+        )
+    
+    elif error_type == ErrorType.RETRIEVAL_ERROR:
+        return (
+            "There was an error searching through the course materials.\n\n"
+            "**Possible causes:**\n"
+            "• The vector database may not be initialized\n"
+            "• Documents may not have been ingested yet\n\n"
+            "**What to do:**\n"
+            "• Run `python ingest.py` in the backend directory\n"
+            "• Check that documents exist in the corpus/ folder\n"
+            "• Restart the backend server if the issue persists"
+        )
+    
+    elif error_type == ErrorType.MODEL_CONNECTION:
+        return (
+            "Unable to connect to the AI model (Ollama).\n\n"
+            "**Possible causes:**\n"
+            "• Ollama service is not running\n"
+            "• Connection to Ollama was refused\n\n"
+            "**What to do:**\n"
+            "• Check if Ollama is running: `ollama list`\n"
+            "• Start Ollama if needed\n"
+            "• Verify OLLAMA_HOST configuration\n"
+            "• If using Docker, ensure the ollama container is running"
+        )
+    
+    elif error_type == ErrorType.MODEL_TIMEOUT:
+        return (
+            "The AI model took too long to respond (timeout).\n\n"
+            "**Possible causes:**\n"
+            "• The model is overloaded or slow\n"
+            "• Your question may be too complex\n"
+            "• The model might be loading for the first time\n\n"
+            "**What to do:**\n"
+            "• Try asking a simpler question\n"
+            "• Wait a moment and try again (the model may be warming up)\n"
+            "• Consider using a faster model like `qwen2.5:1.5b-instruct`"
+        )
+    
+    elif error_type == ErrorType.MODEL_EMPTY_RESPONSE:
+        if sources:
+            return (
+                "The AI model returned an empty response.\n\n"
+                "I found relevant information in the course materials, but the model "
+                "failed to generate an answer. This could be a temporary issue.\n\n"
+                "**What to do:**\n"
+                "• Try rephrasing your question\n"
+                "• Check the sources below for relevant information\n"
+                "• Try again in a moment\n"
+                "• If this persists, restart the backend server"
+            )
+        else:
+            return (
+                "The AI model returned an empty response.\n\n"
+                "**What to do:**\n"
+                "• Try asking your question again\n"
+                "• Rephrase your question more clearly\n"
+                "• Check if Ollama is working: `ollama run mistral 'test'`\n"
+                "• Restart the backend server if the issue persists"
+            )
+    
+    elif error_type == ErrorType.MODEL_ERROR:
+        return (
+            "An error occurred while generating the answer.\n\n"
+            "**What to do:**\n"
+            "• Try asking your question again\n"
+            "• Simplify your question if it's complex\n"
+            "• Check backend logs for technical details\n"
+            "• Restart the backend server if issues persist"
+        )
+    
+    else:  # UNKNOWN
+        return (
+            "An unexpected error occurred.\n\n"
+            "**What to do:**\n"
+            "• Try your question again\n"
+            "• Check backend logs for details\n"
+            "• Restart the backend server\n"
+            "• Report this issue if it continues"
+        )
 
 # --- FastAPI app ---
 app = FastAPI(title="EduMate Local API", version="0.1.0")
@@ -160,15 +279,23 @@ async def chat_stream(req: ChatStreamRequest):
     else:
         # Default: docs mode with retrieval (RAG)
         ctx = []
+        retrieval_error = None
         try:
             ctx = retriever.retrieve(last_user, model_call=ollama_complete)
         except Exception as e:
-            print("Retrieval error:", repr(e))
+            retrieval_error = e
+            print(f"[ERROR] Retrieval error: {repr(e)}")
 
+        # Handle retrieval failure
+        if retrieval_error:
+            async def retrieval_error_gen():
+                yield get_error_message(ErrorType.RETRIEVAL_ERROR, error_details=str(retrieval_error))
+            return StreamingResponse(retrieval_error_gen(), media_type="text/plain")
+
+        # Handle no context found
         if not ctx:
             async def no_context_gen():
-                yield ("I couldn't find that in the provided course materials. "
-                       "Please try rephrasing or ask about another section.")
+                yield get_error_message(ErrorType.NO_CONTEXT)
             return StreamingResponse(no_context_gen(), media_type="text/plain")
 
         # Build prompt with context (same as /chat endpoint)
@@ -180,15 +307,25 @@ async def chat_stream(req: ChatStreamRequest):
             # Use the composed prompt directly
             pass
 
-    # Stream generation with semaphore
+    # Stream generation with semaphore and improved error handling
     async def generate_stream():
         async with generation_semaphore:
             try:
                 async for token in ollama_complete_stream(prompt):
                     yield token
             except Exception as e:
-                print(f"[ERROR] Stream generation failed: {e}")
-                yield f"\n\n[Error generating response: {e}]"
+                error_str = str(e)
+                print(f"[ERROR] Stream generation failed: {repr(e)}")
+                
+                # Classify the error
+                if "timeout" in error_str.lower():
+                    error_type = ErrorType.MODEL_TIMEOUT
+                elif "connection" in error_str.lower():
+                    error_type = ErrorType.MODEL_CONNECTION
+                else:
+                    error_type = ErrorType.MODEL_ERROR
+                
+                yield f"\n\n{get_error_message(error_type, error_details=error_str)}"
 
     return StreamingResponse(generate_stream(), media_type="text/plain")
 
@@ -214,17 +351,24 @@ def chat(req: ChatRequest):
         )
         return {"answer": greeting_response, "sources": []}
 
-    # retrieve context
+    # retrieve context with improved error handling
     ctx = []
+    retrieval_error = None
     try:
         ctx = retriever.retrieve(last_user, model_call=ollama_complete)
     except Exception as e:
-        print("Retrieval error:", repr(e))
+        retrieval_error = e
+        print(f"[ERROR] Retrieval error: {repr(e)}")
 
+    # Handle retrieval failure
+    if retrieval_error:
+        error_msg = get_error_message(ErrorType.RETRIEVAL_ERROR, error_details=str(retrieval_error))
+        return {"answer": error_msg, "sources": []}
+
+    # Handle no context found
     if not ctx:
-        msg = ("I couldn't find that in the provided course materials. "
-               "Please try rephrasing or ask about another section.")
-        return {"answer": msg, "sources": []}
+        error_msg = get_error_message(ErrorType.NO_CONTEXT)
+        return {"answer": error_msg, "sources": []}
 
     # build prompt
     prompt, sources = compose_prompt(ctx, last_user)
@@ -237,26 +381,39 @@ def chat(req: ChatRequest):
     except Exception:
         pass
 
-    # call Ollama
+    # call Ollama with improved error handling
     answer = ""
+    error_type = None
     try:
         answer = ollama_complete(prompt)
         print(f"[DEBUG] Ollama response length: {len(answer)} chars")
+    except RuntimeError as e:
+        error_str = str(e)
+        print(f"[ERROR] Ollama call error: {repr(e)}")
+        
+        # Classify the error based on the exception message
+        if "Empty response" in error_str:
+            error_type = ErrorType.MODEL_EMPTY_RESPONSE
+        elif "ReadTimeout" in error_str or "timeout" in error_str.lower():
+            error_type = ErrorType.MODEL_TIMEOUT
+        elif "ConnectionError" in error_str or "connection" in error_str.lower():
+            error_type = ErrorType.MODEL_CONNECTION
+        else:
+            error_type = ErrorType.MODEL_ERROR
+        
+        error_msg = get_error_message(error_type, sources=sources, error_details=error_str)
+        return {"answer": error_msg, "sources": sources}
     except Exception as e:
-        print("Ollama call error:", repr(e))
-        answer = "[Error: Ollama call failed]"
+        # Catch-all for unexpected errors
+        print(f"[ERROR] Unexpected error during Ollama call: {repr(e)}")
+        error_msg = get_error_message(ErrorType.MODEL_ERROR, sources=sources, error_details=str(e))
+        return {"answer": error_msg, "sources": sources}
 
-    if not answer or answer.strip() in {"", "[Error: Ollama call failed]"}:
-        # Enhanced fallback message with actionable guidance
-        fallback = (
-            "I found relevant information in the course materials, but I'm having trouble "
-            "generating a complete answer right now. Here are some suggestions:\n\n"
-            "• Try rephrasing your question more specifically\n"
-            "• Break complex questions into simpler parts\n"
-            "• Check the sources panel on the left for relevant document sections\n\n"
-            "If the issue persists, the system may need to be restarted."
-        )
-        return {"answer": fallback, "sources": sources}
+    # Handle empty or invalid response
+    if not answer or answer.strip() == "":
+        print("[WARNING] Ollama returned empty answer string")
+        error_msg = get_error_message(ErrorType.MODEL_EMPTY_RESPONSE, sources=sources)
+        return {"answer": error_msg, "sources": sources}
 
     return {"answer": answer, "sources": sources}
 
