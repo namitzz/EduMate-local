@@ -1,6 +1,8 @@
 # EduMate - AI Study Assistant
 
-A lightweight RAG chatbot for students, deployed on **Streamlit** and **Fly.io** using **OpenRouter**.
+A lightweight RAG chatbot for students, deployed on **Streamlit Cloud** and **Fly.io** using **OpenRouter**.
+
+> 🚀 **[Quick Start - Deploy in 5 Minutes](QUICKSTART.md)** | 📖 **[Full Deployment Guide](STREAMLIT_DEPLOYMENT.md)**
 
 ## Architecture
 
@@ -135,6 +137,7 @@ fly billing show
 
 ## 📖 Documentation
 
+- **[QUICKSTART.md](QUICKSTART.md)** - ⚡ Deploy in 5 minutes
 - **[STREAMLIT_DEPLOYMENT.md](STREAMLIT_DEPLOYMENT.md)** - Complete deployment guide for Streamlit Cloud + Fly.io
 - **[SETUP.md](SETUP.md)** - Configuration details
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture
