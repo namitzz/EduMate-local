@@ -21,8 +21,8 @@ import requests
 # Configuration
 # ============================================================================
 
-# API endpoint - can be configured via environment variable
-API_BASE_URL = os.environ.get("API_BASE", "http://localhost:8000")
+# API endpoint - hardcoded to production URL
+API_BASE_URL = "https://edumate-local.fly.dev/"
 
 # ============================================================================
 # Page Configuration
