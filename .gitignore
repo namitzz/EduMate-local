@@ -15,8 +15,7 @@ chroma_db/
 *.swp
 *~
 
-# Ignore files with special characters that may cause issues
-*{*
-*[*
-*}*
-*]*
+# Ignore vim/editor temporary files
+*.swo
+.*.swp
+.*.swo
