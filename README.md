@@ -1,16 +1,42 @@
-# EduMate - AI Study Assistant
+# EduMate - AI Module Convenor Assistant
 
-A lightweight RAG chatbot for students, deployed on **Streamlit Cloud** and **Fly.io** using **OpenRouter**.
+An intelligent AI-powered Module Convenor Assistant that provides **personalized academic guidance, feedback, and mentorship** to students. More than just a Q&A bot, EduMate acts as a mini version of your module convenor, understanding course content deeply and offering tailored support.
+
+> 🚀 **[Quick Start - Deploy in 5 Minutes](QUICKSTART.md)** | 📖 **[Full Deployment Guide](STREAMLIT_DEPLOYMENT.md)**
+
+## 🎯 What Makes EduMate Special?
+
+EduMate goes beyond basic document retrieval to provide **intelligent academic guidance**:
+
+- **🎓 Module Convenor Persona** - Acts like an experienced university professor
+- **🧠 Context-Aware Conversations** - Remembers your discussion and provides continuity
+- **📝 Intent Detection** - Understands whether you need assignment help, concept clarification, or exam prep
+- **💡 Tailored Feedback** - Provides structured guidance, not just answers
+- **📚 RAG-Powered** - References actual course materials with citations
+- **🤝 Mentorship Style** - Encouraging, pedagogical, and supportive
+
+### Interaction Types
+
+EduMate automatically detects your intent and adapts its response style:
+
+1. **Assignment Help** - Structured guidance on coursework, rubric interpretation
+2. **Concept Clarification** - Clear explanations with examples and analogies
+3. **Exam Preparation** - Study strategies, topic prioritization
+4. **Study Planning** - Time management, learning techniques
+5. **Progress Feedback** - Constructive support and improvement suggestions
+6. **General Queries** - Course information and quick facts
 
 > 🚀 **[Quick Start - Deploy in 5 Minutes](QUICKSTART.md)** | 📖 **[Full Deployment Guide](STREAMLIT_DEPLOYMENT.md)**
 
 ## Architecture
 
-- **UI**: Streamlit (simple chat interface)
+- **UI**: Streamlit (enhanced chat interface with session management)
 - **Backend**: FastAPI (deployed on Fly.io)
 - **Vector DB**: ChromaDB (for document retrieval)
 - **Embeddings**: SentenceTransformers (`all-MiniLM-L6-v2`)
 - **LLM**: OpenRouter API (`gpt-3.5-turbo`)
+- **Memory**: In-memory conversation tracking with pattern detection
+- **Persona**: Module Convenor prompt system with intent detection
 
 ## Live Demo
 
@@ -80,6 +106,8 @@ The app is pre-configured for OpenRouter. Configuration in `backend/config.py`:
 - `OPENAI_API_KEY` - Pre-configured API key
 - `OPENAI_MODEL=openai/gpt-3.5-turbo` - Default model
 - `FAST_MODE=1` - Optimized for speed
+- `ENABLE_CONVERSATION_MEMORY=1` - Context-aware conversations
+- `MAX_CONVERSATION_HISTORY=10` - Number of turns to remember
 
 ## Adding Documents
 
@@ -96,11 +124,13 @@ This will build the vector index from your documents.
 
 ## How It Works
 
-1. User asks a question via Streamlit UI
-2. UI sends request to Fly.io backend
-3. Backend retrieves relevant chunks from ChromaDB
-4. OpenRouter generates answer based on retrieved context
-5. Answer is displayed in UI with source citations
+1. **Student asks a question** via Streamlit UI (with session tracking)
+2. **UI sends request** to Fly.io backend with conversation context
+3. **Intent detection** identifies the type of academic support needed
+4. **Backend retrieves** relevant chunks from ChromaDB
+5. **Module Convenor persona** generates tailored academic guidance
+6. **Conversation memory** tracks context for follow-up questions
+7. **Answer displayed** in UI with source citations and suggestions
 
 ## 💰 Free Tier & Cost Management
 
