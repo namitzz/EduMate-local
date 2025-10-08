@@ -1,0 +1,251 @@
+# Sample Course Material - Introduction to Databases
+
+## Course Overview
+
+Welcome to CS101: Introduction to Databases. This course covers fundamental database concepts, SQL, and database design principles.
+
+### Module Convenor
+Professor Sarah Chen
+Email: s.chen@university.edu
+Office Hours: Tuesdays 2-4pm, Room 301
+
+## Learning Objectives
+
+By the end of this course, you will be able to:
+
+1. Design and implement relational databases using ER modeling
+2. Write complex SQL queries for data manipulation and retrieval
+3. Understand and apply normalization principles (1NF, 2NF, 3NF, BCNF)
+4. Implement transactions and understand ACID properties
+5. Optimize database performance through indexing
+
+## Assessment Structure
+
+### Assignment 1: ER Diagram Design (20%)
+**Due**: Week 4, Friday 5pm
+**Description**: Design an ER diagram for a given business scenario
+**Key Requirements**:
+- Identify all entities and attributes
+- Define relationships and cardinality
+- Specify primary and foreign keys
+- Document assumptions clearly
+
+**Rubric**:
+- Entity identification and completeness (30%)
+- Relationship accuracy and cardinality (40%)
+- Notation and presentation (20%)
+- Documentation and assumptions (10%)
+
+### Assignment 2: SQL Query Implementation (30%)
+**Due**: Week 8, Friday 5pm
+**Description**: Implement a series of SQL queries for a provided database
+**Key Requirements**:
+- Write SELECT queries with joins
+- Implement aggregation and grouping
+- Use subqueries where appropriate
+- Optimize for performance
+
+### Final Exam (50%)
+**Date**: Exam period, Week 13
+**Format**: 2-hour written exam
+**Topics Covered**:
+- Database design and ER modeling (30%)
+- SQL queries and operations (40%)
+- Normalization and theory (15%)
+- Transactions and concurrency (15%)
+
+## Course Topics
+
+### Week 1-2: Introduction to Databases
+- What is a database?
+- Database management systems (DBMS)
+- Relational model fundamentals
+- Data types and constraints
+
+### Week 3-4: Entity-Relationship Modeling
+- ER diagrams and notation
+- Entities, attributes, and relationships
+- Cardinality and participation constraints
+- Weak entities and identifying relationships
+- ER-to-relational mapping
+
+### Week 5-6: SQL Fundamentals
+- Data Definition Language (DDL)
+- Data Manipulation Language (DML)
+- SELECT statements and filtering
+- Joins (INNER, OUTER, CROSS)
+- Aggregation functions (COUNT, SUM, AVG, MAX, MIN)
+- GROUP BY and HAVING clauses
+
+### Week 7-8: Advanced SQL
+- Subqueries (correlated and non-correlated)
+- Views and derived tables
+- Set operations (UNION, INTERSECT, EXCEPT)
+- NULL handling
+- String functions and pattern matching
+
+### Week 9-10: Normalization
+- Functional dependencies
+- First Normal Form (1NF)
+- Second Normal Form (2NF)
+- Third Normal Form (3NF)
+- Boyce-Codd Normal Form (BCNF)
+- Denormalization considerations
+
+### Week 11: Transactions and Concurrency
+- ACID properties (Atomicity, Consistency, Isolation, Durability)
+- Transaction management
+- Concurrency control
+- Locking mechanisms
+- Deadlock detection and prevention
+
+### Week 12: Performance and Indexing
+- Database indexing strategies
+- B-tree and hash indexes
+- Query optimization
+- Execution plans
+- Performance tuning
+
+## Study Tips
+
+### For Assignments
+1. **Start early**: Database design requires iteration
+2. **Read the rubric**: Understand exactly what's being assessed
+3. **Test your SQL**: Use the practice database to verify queries
+4. **Document assumptions**: Explain your design decisions
+5. **Ask questions**: Use office hours or the AI assistant
+
+### For Exams
+1. **Practice, practice, practice**: Work through all tutorial problems
+2. **Understand concepts**: Don't just memorize SQL syntax
+3. **Draw diagrams**: ER modeling is visual - practice drawing
+4. **Time management**: Allocate time based on mark allocation
+5. **Review past exams**: Understand question styles and expectations
+
+## Resources
+
+### Required Textbook
+"Database System Concepts" by Silberschatz, Korth, and Sudarshan (7th Edition)
+
+### Recommended Reading
+- "SQL Performance Explained" by Markus Winand
+- Online SQL tutorials at sqlzoo.net
+- W3Schools SQL reference
+
+### Practice Databases
+- Course practice database: Available on course website
+- SQLite sandbox: For personal experimentation
+- PostgreSQL playground: For advanced features
+
+## Getting Help
+
+### AI Module Convenor Assistant
+Available 24/7 through the course website. Can help with:
+- Concept clarification
+- Assignment guidance
+- Study planning
+- Exam preparation
+
+### Office Hours
+Professor Chen: Tuesdays 2-4pm, Room 301
+Teaching Assistants: 
+- Mike Johnson: Wednesdays 10am-12pm, Lab 2
+- Sarah Lee: Thursdays 3-5pm, Lab 2
+
+### Discussion Forum
+Post questions on the course forum - response within 24 hours guaranteed
+
+## Academic Integrity
+
+All work must be your own. The AI assistant provides guidance but should not write your assignments. Collaboration is encouraged for learning, but submissions must be individual work.
+
+**Plagiarism**: Using others' work without citation is a serious offense
+**Collusion**: Submitting substantially similar work is not permitted
+**Contract cheating**: Having someone else complete your work is prohibited
+
+If in doubt about what's acceptable, ask!
+
+## Example: Normalization Process
+
+Let's work through a normalization example:
+
+**Unnormalized Table**:
+```
+Student(StudentID, StudentName, CourseID, CourseName, Instructor, InstructorEmail, Grade)
+```
+
+**Problems**:
+- Redundant data (CourseName repeated for each enrollment)
+- Update anomalies (changing instructor email requires multiple updates)
+- Insertion anomalies (can't add a course without a student)
+
+**1NF (Atomic Values)**:
+Already satisfied - all attributes contain single values
+
+**2NF (No Partial Dependencies)**:
+Composite key: (StudentID, CourseID)
+- StudentName depends only on StudentID (partial dependency)
+- CourseName, Instructor, InstructorEmail depend only on CourseID (partial dependency)
+
+Split into:
+```
+Student(StudentID, StudentName)
+Course(CourseID, CourseName, Instructor, InstructorEmail)
+Enrollment(StudentID, CourseID, Grade)
+```
+
+**3NF (No Transitive Dependencies)**:
+- InstructorEmail depends on Instructor (transitive dependency)
+
+Final schema:
+```
+Student(StudentID, StudentName)
+Instructor(InstructorID, InstructorName, InstructorEmail)
+Course(CourseID, CourseName, InstructorID)
+Enrollment(StudentID, CourseID, Grade)
+```
+
+This example demonstrates how normalization eliminates redundancy and anomalies!
+
+## Assignment 1 - Detailed Requirements
+
+### Scenario
+You are designing a database for a university library system.
+
+**Requirements**:
+- The library has multiple books, each with ISBN, title, author, publisher, and publication year
+- Books can have multiple copies, each with a unique copy ID and condition status
+- Members (students and staff) can borrow books
+- Each member has a member ID, name, email, and member type
+- Loans are tracked with loan date, due date, and return date
+- A member can have multiple loans, but each copy can only be loaned to one member at a time
+- The library tracks which member borrowed which copy and when
+- Fines are calculated for late returns
+
+### Deliverables
+1. **ER Diagram** (PDF format)
+   - Use standard notation (crow's foot or Chen notation)
+   - Show all entities, attributes, and relationships
+   - Indicate primary keys (underlined)
+   - Show cardinality for all relationships
+
+2. **Documentation** (1-2 pages)
+   - List all assumptions made
+   - Explain major design decisions
+   - Justify entity and relationship choices
+
+### Common Mistakes to Avoid
+1. Missing weak entities (e.g., book copies depend on books)
+2. Incorrect cardinality (think about real-world constraints)
+3. Redundant relationships (avoid double-linking entities)
+4. Attributes in wrong entities (e.g., due_date should be in Loan, not Copy)
+5. Not documenting assumptions
+
+### Success Tips
+1. Start with entities - identify the "things" in the system
+2. Then add relationships - how entities connect
+3. Determine cardinality - think about the real world
+4. Identify keys - what uniquely identifies each entity?
+5. Review the rubric - make sure you address all criteria
+
+Need help? Ask the AI Module Convenor Assistant or attend office hours!

@@ -110,4 +110,13 @@ TEMPERATURE  = float(os.getenv("TEMP", "0.3"))
 # Concurrency control for Fast Mode pilot
 MAX_ACTIVE_GENERATIONS = int(os.getenv("MAX_ACTIVE_GENERATIONS", "1"))
 
+# -----------------------
+# Conversation Memory Configuration
+# -----------------------
+# Maximum number of conversation turns to retain per session
+MAX_CONVERSATION_HISTORY = int(os.getenv("MAX_CONVERSATION_HISTORY", "10"))
+
+# Enable conversation memory for context-aware responses
+ENABLE_CONVERSATION_MEMORY = os.getenv("ENABLE_CONVERSATION_MEMORY", "1") == "1"
+
 
