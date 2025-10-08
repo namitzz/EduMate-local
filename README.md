@@ -1,9 +1,9 @@
-A lightweight, RAG chatbot for students. Runs **entirely locally** using:
+A lightweight, RAG chatbot for students. Runs **locally or in the cloud** using:
 - **Streamlit** UI
 - **FastAPI** backend
 - **ChromaDB** (persisted locally)
 - **SentenceTransformers** (`all-MiniLM-L6-v2`) for embeddings
-- **Ollama** (e.g., `mistral` or `llama3`) for generation
+- **Ollama** (local) or **OpenRouter** (cloud) for generation
 
 ## Quick Start (Local, no Docker)
 1) Install [Ollama](https://ollama.com) and pull a small model:
@@ -111,9 +111,12 @@ docker compose down
 ## Config
 See `backend/config.py` for detailed configuration options.
 
-### Ollama Connection Configuration
+### LLM Provider Configuration
 
-EduMate requires an Ollama instance for LLM generation. Configure based on your deployment:
+EduMate supports two LLM providers:
+
+#### 1. Ollama (Local Development)
+**Default option. Best for local development and privacy.**
 
 - **Local Development**: Uses `http://localhost:11434` by default
 - **Docker**: Configured automatically to `http://ollama:11434` in docker-compose.yml
@@ -122,6 +125,31 @@ EduMate requires an Ollama instance for LLM generation. Configure based on your 
   export OLLAMA_HOST=https://your-ollama-api.com
   ```
   ⚠️ **Do NOT use localhost in cloud deployments** - it won't work
+
+#### 2. OpenRouter (Cloud Deployment)
+**Best for production deployments on Fly.io, Streamlit Cloud, etc.**
+
+OpenRouter provides access to various LLMs through an OpenAI-compatible API.
+
+**Setup:**
+```bash
+# Enable OpenRouter
+export USE_OPENAI=1
+
+# Set your OpenRouter API key (get it from https://openrouter.ai/keys)
+export OPENAI_API_KEY=sk-or-v1-your-api-key-here
+
+# Optional: Choose a specific model (default: openai/gpt-3.5-turbo)
+export OPENAI_MODEL=openai/gpt-3.5-turbo
+# Other options: openai/gpt-4, anthropic/claude-3-haiku, etc.
+```
+
+**Environment Variable Summary:**
+- `USE_OPENAI=1` → Use OpenRouter (cloud)
+- `USE_OPENAI=0` or unset → Use Ollama (local, default)
+- `OPENAI_API_KEY` → Your OpenRouter API key (required when USE_OPENAI=1)
+- `OPENAI_MODEL` → Model to use with OpenRouter
+- `OPENAI_BASE_URL` → Base URL for OpenRouter (default: https://openrouter.ai/api/v1)
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed cloud configuration instructions.
 

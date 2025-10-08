@@ -79,11 +79,132 @@ docker run -p 8000:8000 \
 ```
 
 **Note:** This deployment method requires:
-- An external Ollama instance (or modify code to use cloud LLM APIs)
+- An external Ollama instance, OR use OpenRouter (see Cloud LLM Provider section below)
 - Corpus files are built into the image (update and rebuild for changes)
 - No UI included (deploy UI separately or use the API directly)
 
 **For full-stack deployment**, use `docker compose up --build` instead.
+
+## Cloud LLM Provider (OpenRouter)
+
+For production cloud deployments (Fly.io, Railway, Streamlit Cloud, etc.), you can use **OpenRouter** instead of running Ollama. OpenRouter provides access to various LLMs through an OpenAI-compatible API.
+
+### Why OpenRouter for Cloud?
+- ✅ No need to manage Ollama infrastructure
+- ✅ Access to multiple models (GPT-3.5, GPT-4, Claude, etc.)
+- ✅ Pay-per-use pricing
+- ✅ Better reliability for production
+- ✅ Easier scaling
+
+### Setup Instructions
+
+1. **Get an OpenRouter API Key**
+   - Sign up at https://openrouter.ai
+   - Get your API key from https://openrouter.ai/keys
+
+2. **Configure Environment Variables**
+   ```bash
+   # Enable OpenRouter
+   export USE_OPENAI=1
+   
+   # Set your API key
+   export OPENAI_API_KEY=sk-or-v1-your-api-key-here
+   
+   # Optional: Choose a specific model (default: openai/gpt-3.5-turbo)
+   export OPENAI_MODEL=openai/gpt-3.5-turbo
+   
+   # Keep Fast Mode enabled for better performance
+   export FAST_MODE=1
+   export NUM_PREDICT=400
+   export TEMP=0.3
+   ```
+
+3. **Available Models**
+   OpenRouter supports many models. Popular options:
+   - `openai/gpt-3.5-turbo` - Fast, cost-effective (default)
+   - `openai/gpt-4` - Higher quality, more expensive
+   - `anthropic/claude-3-haiku` - Fast Claude model
+   - `anthropic/claude-3-sonnet` - Balanced Claude model
+   - See full list: https://openrouter.ai/models
+
+4. **Deploy with Docker**
+   ```bash
+   docker build -t edumate-backend .
+   
+   docker run -p 8000:8000 \
+     -e USE_OPENAI=1 \
+     -e OPENAI_API_KEY=sk-or-v1-your-api-key-here \
+     -e OPENAI_MODEL=openai/gpt-3.5-turbo \
+     -e FAST_MODE=1 \
+     edumate-backend
+   ```
+
+5. **Cost Considerations**
+   - Monitor usage at https://openrouter.ai/activity
+   - Set spending limits in your OpenRouter account
+   - Start with gpt-3.5-turbo for cost efficiency
+   - Fast Mode (NUM_PREDICT=400) keeps responses short and costs low
+
+### Example: Fly.io Deployment with OpenRouter
+
+1. **Create `fly.toml`** (if not exists):
+   ```toml
+   app = "edumate-backend"
+   primary_region = "iad"
+   
+   [build]
+     dockerfile = "Dockerfile"
+   
+   [env]
+     USE_OPENAI = "1"
+     FAST_MODE = "1"
+     NUM_PREDICT = "400"
+     TEMP = "0.3"
+     OPENAI_MODEL = "openai/gpt-3.5-turbo"
+   
+   [[services]]
+     internal_port = 8000
+     protocol = "tcp"
+   
+     [[services.ports]]
+       port = 80
+       handlers = ["http"]
+     
+     [[services.ports]]
+       port = 443
+       handlers = ["tls", "http"]
+   ```
+
+2. **Set secrets**:
+   ```bash
+   flyctl secrets set OPENAI_API_KEY=sk-or-v1-your-api-key-here
+   ```
+
+3. **Deploy**:
+   ```bash
+   flyctl launch
+   flyctl deploy
+   ```
+
+### Switching Between Ollama and OpenRouter
+
+You can easily switch between local Ollama (development) and OpenRouter (production):
+
+**Local Development (Ollama):**
+```bash
+export USE_OPENAI=0  # or unset
+export OLLAMA_HOST=http://localhost:11434
+export OLLAMA_MODEL=mistral
+```
+
+**Production (OpenRouter):**
+```bash
+export USE_OPENAI=1
+export OPENAI_API_KEY=sk-or-v1-your-api-key-here
+export OPENAI_MODEL=openai/gpt-3.5-turbo
+```
+
+The same codebase works with both providers without any changes!
 
 ## Deploy on a Server (LAN/Cloud)
 
