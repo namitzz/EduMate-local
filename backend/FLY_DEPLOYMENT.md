@@ -120,7 +120,23 @@ API_BASE = "https://edumate-local.fly.dev"
 
 1. **No Ollama**: The free tier cannot run Ollama for LLM generation. You need to:
    - Modify the backend to use cloud LLM APIs (OpenAI, Anthropic, etc.), OR
-   - Use a separate Ollama instance (requires additional hosting)
+   - Use a separate Ollama instance (requires additional hosting), OR
+   - Connect to a public/shared Ollama API endpoint
+   
+   **To connect to a public Ollama API:**
+   ```bash
+   # Configure OLLAMA_HOST with your public endpoint
+   fly secrets set OLLAMA_HOST=https://your-ollama-api.com
+   
+   # Important: Use the actual public endpoint URL, NOT localhost
+   # Examples:
+   # - https://api.ollama.ai (if using a cloud Ollama service)
+   # - https://your-ollama.fly.dev (if hosting Ollama separately on Fly.io)
+   # - https://your-server.com:11434 (custom hosted instance)
+   
+   # Test the endpoint before deploying:
+   curl https://your-ollama-api.com/api/tags
+   ```
 
 2. **Ephemeral Storage**: ChromaDB data will be reset on each deployment
    - Consider using external vector database services for persistence
@@ -220,14 +236,56 @@ fly logs --grep health
 # Adjust health check settings in fly.toml if needed
 ```
 
+### Cannot connect to Ollama
+
+```bash
+# Check the logs for connection errors
+fly logs | grep -i ollama
+
+# Verify OLLAMA_HOST is set correctly
+fly secrets list
+
+# Common issues:
+# ❌ OLLAMA_HOST=http://localhost:11434 
+#    → Wrong: localhost in cloud = app container, not external service
+# ❌ OLLAMA_HOST=http://ollama:11434
+#    → Wrong: ollama hostname only works with Docker Compose
+# ✅ OLLAMA_HOST=https://your-public-ollama-api.com
+#    → Correct: Use actual public endpoint URL
+
+# Set the correct public endpoint:
+fly secrets set OLLAMA_HOST=https://your-ollama-api.com
+
+# Test endpoint accessibility:
+curl https://your-ollama-api.com/api/tags
+
+# Redeploy after fixing:
+fly deploy
+```
+
 ## Advanced Configuration
 
 ### Environment Variables
 
 ```bash
-# Set environment variables
+# Set environment variables for your deployment
 fly secrets set FAST_MODE=1
 fly secrets set MAX_ACTIVE_GENERATIONS=1
+
+# IMPORTANT: Configure Ollama connection for cloud deployment
+# Set OLLAMA_HOST to your public Ollama API endpoint (NOT localhost)
+fly secrets set OLLAMA_HOST=https://your-ollama-api.com
+# OR
+fly secrets set OLLAMA_URL=https://api.ollama.ai
+
+# Examples of valid cloud endpoints:
+# - https://api.ollama.ai (if using Ollama cloud service)
+# - https://your-ollama-instance.fly.dev (separate Ollama deployment)
+# - https://your-ollama-server.com:11434 (custom hosted instance)
+
+# DO NOT use localhost or ollama hostname in cloud deployments:
+# ❌ http://localhost:11434 - Will NOT work (localhost = app container)
+# ❌ http://ollama:11434 - Will NOT work (no container networking)
 
 # List all secrets
 fly secrets list

@@ -55,13 +55,30 @@ MULTI_QUERY  = False    # re-enable later for recall
 # -----------------------
 # LLM (Ollama)
 # -----------------------
-# docker-compose.yml sets OLLAMA_HOST to http://ollama:11434
-# For local (non-Docker) use, set OLLAMA_HOST=http://localhost:11434 in .env
+# OLLAMA_HOST Configuration Guide:
+# 
+# 1. LOCAL DEVELOPMENT (non-Docker):
+#    - Use: http://localhost:11434
+#    - Ollama must be running on your local machine
+#    - Default if no environment variable is set
+#
+# 2. DOCKER DEPLOYMENTS:
+#    - Use: http://ollama:11434
+#    - Set in docker-compose.yml (container-to-container communication)
+#    - The 'ollama' hostname resolves to the Ollama container
+#
+# 3. CLOUD/PUBLIC API DEPLOYMENTS (Fly.io, Streamlit Cloud, etc.):
+#    - Use: Your assigned public Ollama API endpoint
+#    - Examples: https://api.ollama.ai, https://your-ollama-instance.com
+#    - Set OLLAMA_HOST or OLLAMA_URL environment variable to the public endpoint
+#    - Do NOT use localhost in cloud deployments - it won't work
+#    - May require API key authentication (check your provider's documentation)
+#
+# The code tries OLLAMA_URL first (used in .env.example), then OLLAMA_HOST,
+# then defaults to http://localhost:11434 for local development convenience.
+
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
 
-# Try OLLAMA_URL first (used in .env.example), then OLLAMA_HOST
-# Default to http://localhost:11434 for better local (non-Docker) experience
-# Docker deployments should set OLLAMA_HOST=http://ollama:11434 in docker-compose.yml
 OLLAMA_HOST = os.getenv("OLLAMA_URL", os.getenv("OLLAMA_HOST", "http://localhost:11434"))
 
 # Validate OLLAMA_HOST is not empty
