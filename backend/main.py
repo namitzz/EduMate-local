@@ -62,6 +62,15 @@ def get_error_message(error_type: ErrorType, sources: List[str] = None, error_de
         )
     
     elif error_type == ErrorType.MODEL_CONNECTION:
+        # Extract URL from error_details if available
+        url_info = ""
+        if error_details and "URL:" in error_details:
+            try:
+                url_part = error_details.split("URL:")[1].split(")")[0].strip()
+                url_info = f"\n\n**Connection attempted to:** {url_part}"
+            except:
+                pass
+        
         return (
             "Unable to connect to the AI model (Ollama).\n\n"
             "**Possible causes:**\n"
@@ -72,6 +81,7 @@ def get_error_message(error_type: ErrorType, sources: List[str] = None, error_de
             "• Start Ollama if needed\n"
             "• Verify OLLAMA_HOST configuration\n"
             "• If using Docker, ensure the ollama container is running"
+            f"{url_info}"
         )
     
     elif error_type == ErrorType.MODEL_TIMEOUT:
