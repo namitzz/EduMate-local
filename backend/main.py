@@ -45,15 +45,20 @@ def is_greeting_or_chitchat(msg: str) -> bool:
     """
     msg_lower = msg.strip().lower()
     
-    # Very short messages (likely greetings)
-    if len(msg_lower) <= 15:
-        # Common greeting patterns
+    # Expanded greeting patterns to catch more variations
+    # Support longer greetings (up to 30 chars)
+    if len(msg_lower) <= 30:
+        # Comprehensive greeting patterns
         greeting_patterns = [
-            r'^(hi|hello|hey|hii|hiii|heya|heyy|heyyy|howdy|greetings|sup|yo)([!.?]*)?$',
-            r'^(good\s+(morning|afternoon|evening|day|night))([!.?]*)?$',
-            r'^(what\'?s?\s+up|wassup|whats\s+up)([!.?]*)?$',
-            r'^(how\s+(are|r)\s+(you|u))([!.?]*)?$',
-            r'^(how\'?s?\s+it\s+going)([!.?]*)?$',
+            r'^(hi|hello|hey|hii|hiii|heya|heyy|heyyy|howdy|greetings|sup|yo|hola|aloha|salut)([!.?,\s]*)?$',
+            r'^(hi|hello|hey)\s+(there|everyone|all)([!.?,\s]*)?$',
+            r'^(good\s+(morning|afternoon|evening|day|night))([!.?,\s]*)?$',
+            r'^(what\'?s?\s+up|wassup|whats\s+up|whatsup)([!.?,\s]*)?$',
+            r'^(how\s+(are|r)\s+(you|u|ya))([!.?,\s]*)?$',
+            r'^(how\'?s?\s+it\s+going)([!.?,\s]*)?$',
+            r'^(nice\s+to\s+meet\s+you)([!.?,\s]*)?$',
+            r'^(thanks|thank\s+you|thx|ty)([!.?,\s]*)?$',
+            r'^(bye|goodbye|see\s+ya|cya|later)([!.?,\s]*)?$',
         ]
         
         for pattern in greeting_patterns:
@@ -68,30 +73,36 @@ def compose_prompt(contexts: List[Dict], user_msg: str):
     """
     Build a grounded prompt from retrieved contexts with inline citation markers.
     Returns (prompt_str, sources_list).
+    Optimized for faster generation.
     """
-    # limit to top 4 chunks, trim each to avoid huge prompts
-    contexts = contexts[:4]
+    # Limit to top 3 chunks in fast mode, trim each to avoid huge prompts
+    max_contexts = 3 if config.FAST_MODE else 4
+    contexts = contexts[:max_contexts]
     sources, ctx_text = [], []
+    
+    # Reduce snippet size for faster processing
+    max_snippet_len = 800 if config.FAST_MODE else 1200
+    
     for i, c in enumerate(contexts, start=1):
         marker = chr(9311 + i)  # ①, ②, ...
-        snippet = c["doc"][:1200]  # trim to ~1200 chars
+        snippet = c["doc"][:max_snippet_len]
         ctx_text.append(f"[{marker}] {snippet}")
         meta = c.get("meta") or {}
         sources.append(f"{marker} {meta.get('file')} (chunk {meta.get('chunk')})")
 
+    # More concise system prompt for faster generation
     system = (
-        "You are EduMate, a helpful study assistant. Answer the user's question based on the provided context. "
-        "If the information is in the context, provide a clear and direct answer. "
-        "If the answer is not in the context, politely say so and suggest the user consult other resources. "
-        "Be concise but complete. Add inline citation markers [①, ②, ...] when referencing specific sources."
+        "You are EduMate, a study assistant. Answer based on the context provided. "
+        "Be clear and concise. Use citation markers [①, ②, ...] for sources. "
+        "If the answer isn't in the context, say so briefly."
     )
 
     context_block = "\n".join(ctx_text) if ctx_text else "(no context)"
     prompt = (
         system
         + "\n\nContext:\n" + context_block
-        + "\n\nUser question:\n" + user_msg
-        + "\n\nAnswer (with inline markers for citations where relevant):\n"
+        + "\n\nQuestion: " + user_msg
+        + "\n\nAnswer:"
     )
     return prompt, sources
 
@@ -136,14 +147,14 @@ async def chat_stream(req: ChatStreamRequest):
     if mode == "coach":
         # Study coaching mode - no retrieval, general study advice
         prompt = (
-            "You are EduMate, a supportive study coach. "
-            "Provide helpful, encouraging study advice and strategies. "
-            f"User question: {last_user}\n\nAnswer:"
+            "You are EduMate, a study coach. Provide helpful, encouraging study advice. "
+            "Be concise and practical.\n\n"
+            f"Question: {last_user}\n\nAnswer:"
         )
     elif mode == "facts":
         # Quick facts mode - no retrieval, concise answers
         prompt = (
-            "You are EduMate. Provide a brief, factual answer. "
+            "You are EduMate. Provide a brief, factual answer.\n\n"
             f"Question: {last_user}\n\nAnswer:"
         )
     else:

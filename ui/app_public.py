@@ -2,6 +2,7 @@ import os
 import streamlit as st
 import requests
 import re
+import time
 
 # Configuration
 API_BASE = os.environ.get("EDUMATE_API_URL", os.environ.get("API_BASE", "http://localhost:8000"))
@@ -10,8 +11,42 @@ API_BASE = os.environ.get("EDUMATE_API_URL", os.environ.get("API_BASE", "http://
 st.set_page_config(
     page_title="EduMate – Study Assistant",
     page_icon="🎓",
-    layout="centered"
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
+
+# Custom CSS for better UI
+st.markdown("""
+<style>
+    /* Improve chat message styling */
+    .stChatMessage {
+        padding: 1rem;
+        border-radius: 0.5rem;
+    }
+    
+    /* Better button styling */
+    .stButton button {
+        border-radius: 0.5rem;
+        transition: all 0.2s;
+    }
+    
+    .stButton button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    /* Improve spacing */
+    .block-container {
+        padding-top: 2rem;
+        max-width: 800px;
+    }
+    
+    /* Loading spinner color */
+    .stSpinner > div {
+        border-top-color: #FF4B4B;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Header with optional logo
 logo_path = "static/logo.png"
@@ -87,31 +122,43 @@ if prompt := st.chat_input("Ask me anything..."):
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
+        start_time = time.time()
 
         try:
-            # Prepare request with current mode
-            payload = {
-                "messages": st.session_state.messages,
-                "mode": st.session_state.mode
-            }
+            # Show typing indicator
+            with st.spinner("Thinking..."):
+                # Prepare request with current mode
+                payload = {
+                    "messages": st.session_state.messages,
+                    "mode": st.session_state.mode
+                }
 
-            # Stream response from API
-            with requests.post(
-                f"{API_BASE}/chat_stream",
-                json=payload,
-                stream=True,
-                timeout=120
-            ) as response:
-                response.raise_for_status()
-                
-                # Stream tokens as they arrive
-                for chunk in response.iter_content(chunk_size=None, decode_unicode=True):
-                    if chunk:
-                        full_response += chunk
-                        message_placeholder.markdown(full_response + "▌")
-                
-                # Remove cursor and show final response
-                message_placeholder.markdown(full_response)
+                # Stream response from API
+                with requests.post(
+                    f"{API_BASE}/chat_stream",
+                    json=payload,
+                    stream=True,
+                    timeout=90  # Reduced timeout for faster responses
+                ) as response:
+                    response.raise_for_status()
+                    
+                    first_token = True
+                    # Stream tokens as they arrive
+                    for chunk in response.iter_content(chunk_size=None, decode_unicode=True):
+                        if chunk:
+                            if first_token:
+                                elapsed = time.time() - start_time
+                                print(f"[Performance] First token received in {elapsed:.2f}s")
+                                first_token = False
+                            full_response += chunk
+                            message_placeholder.markdown(full_response + "▌")
+                    
+                    # Remove cursor and show final response
+                    message_placeholder.markdown(full_response)
+                    
+                    # Log total response time
+                    total_time = time.time() - start_time
+                    print(f"[Performance] Total response time: {total_time:.2f}s")
 
             # Evidence mode check (only in docs mode)
             if st.session_state.mode == "docs" and st.session_state.get("evidence_mode", False):
