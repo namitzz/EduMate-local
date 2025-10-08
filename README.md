@@ -191,12 +191,20 @@ For detailed deployment instructions including cloud deployment and Fly.io free 
 
 **Quick Options:**
 
-1. **Docker (Local/Server):**
+1. **Docker Compose (Full Stack - Recommended):**
    ```bash
    docker compose up --build
    ```
+   Deploys Ollama + Backend + UI together.
 
-2. **Fly.io Free Tier (Cloud):**
+2. **Root Dockerfile (Backend Only - Cloud Platforms):**
+   ```bash
+   docker build -t edumate-backend .
+   docker run -p 8000:8000 -e OLLAMA_HOST=<your-ollama-host> edumate-backend
+   ```
+   For platforms like Railway, Render, or any service that auto-detects Dockerfiles in the root.
+
+3. **Fly.io Free Tier (Cloud):**
    ```bash
    cd backend
    fly launch

@@ -59,6 +59,32 @@ OLLAMA_MODEL: qwen2.5:1.5b-instruct
 echo "OLLAMA_MODEL=qwen2.5:1.5b-instruct" >> .env
 ```
 
+## Standalone Backend Deployment
+
+For cloud platforms that auto-detect Dockerfiles (Railway, Render, etc.), use the root-level Dockerfile:
+
+### Using the Root Dockerfile
+
+The root Dockerfile builds the backend API only and is designed for platforms that expect a Dockerfile in the repository root.
+
+```bash
+# Build the backend image
+docker build -t edumate-backend .
+
+# Run with an external Ollama instance
+docker run -p 8000:8000 \
+  -e OLLAMA_HOST=http://your-ollama-host:11434 \
+  -e OLLAMA_MODEL=mistral \
+  edumate-backend
+```
+
+**Note:** This deployment method requires:
+- An external Ollama instance (or modify code to use cloud LLM APIs)
+- Corpus files are built into the image (update and rebuild for changes)
+- No UI included (deploy UI separately or use the API directly)
+
+**For full-stack deployment**, use `docker compose up --build` instead.
+
 ## Deploy on a Server (LAN/Cloud)
 
 ### LAN Deployment (for students on same network)

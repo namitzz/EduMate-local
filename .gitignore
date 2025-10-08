@@ -8,3 +8,15 @@ chroma_db/
 .idea/
 .vscode/
 *.sqlite
+
+# Ignore temporary and build artifacts
+*.tmp
+*.temp
+*.swp
+*~
+
+# Ignore files with special characters that may cause issues
+*{*
+*[*
+*}*
+*]*
