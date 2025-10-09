@@ -1,86 +1,33 @@
-# fly.toml - Fly.io configuration for EduMate Backend API
-# 
-# ⚠️ FREE TIER CONFIGURATION ⚠️
-# This configuration is optimized for Fly.io's free tier to ensure NO CHARGES.
-# 
-# Free tier includes:
-# - 3 shared-cpu-1x VMs with 256MB RAM each
-# - 160GB outbound data transfer per month
-# - Automatic start/stop to conserve resources
-# 
-# IMPORTANT: Monitor your usage at https://fly.io/dashboard
-# To set spending limits: fly orgs billing-limits set
-# To check current usage: fly billing show
+cat > backend/fly.toml << "a"
+# fly.toml — EduMate Backend (FastAPI/Uvicorn)
 
-app = "edumate-local"
-primary_region = "iad"  # Change to your nearest region (iad=US East, lhr=London, syd=Sydney)
+app = "edumate-local"            # <--- change if taken (also update your Streamlit API base URL)
+primary_region = "lhr"           # London (pick your nearest: lhr, iad, syd, etc.)
 
+# Optional env that your app expects. Do NOT put secrets here.
+[env]
+  PORT = "8080"                  # uvicorn will listen on this port
+
+# We’re using the Dockerfile in this folder (backend/)
 [build]
   dockerfile = "Dockerfile"
 
+# Modern Machines config for HTTP apps
 [http_service]
-  internal_port = 8000
+  internal_port = 8080
   force_https = true
-  auto_stop_machines = true   # ✅ Auto-stop when idle to save resources
-  auto_start_machines = true  # ✅ Auto-start on incoming requests
-  min_machines_running = 0    # ✅ Allow scaling to zero when idle
+  auto_start_machines = true     # wake on request
+  auto_stop_machines = true      # sleep when idle (saves free-tier minutes)
+  min_machines_running = 0
+  concurrency = { type = "requests", soft_limit = 5, hard_limit = 10 }
 
+# Simple health check (FastAPI should serve GET /health with 200 OK)
 [checks]
   [checks.health]
-    grace_period = "30s"
-    interval = "15s"
+    type = "http"
+    port = 8080
     method = "get"
     path = "/health"
-    timeout = "10s"
+    interval = "15s"
+    timeout  = "2s"
 
-# Free tier VM configuration: 256MB RAM, 1 shared CPU
-[[vm]]
-  memory = "256mb"
-  cpu_kind = "shared"
-  cpus = 1
-
-# Environment variables
-[env]
-  PORT = "8000"
-  FAST_MODE = "1"                    # Enable fast mode for better performance
-  MAX_ACTIVE_GENERATIONS = "1"       # Limit concurrent requests on free tier
-  USE_OPENAI = "1"                   # Use OpenRouter instead of Ollama
-  OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
-  OPENAI_MODEL = "openai/gpt-3.5-turbo"
-
-# ⚠️ NO PERSISTENT VOLUMES - Data will be ephemeral
-# For production with persistent data, you would need:
-# [[mounts]]
-#   source = "edumate_data"
-#   destination = "/app/chroma_db"
-# But this requires paid storage on Fly.io
-
-# ⚠️ NO PAID ADD-ONS ENABLED
-# No databases, no Redis, no object storage
-
-##############################################################################
-# DEPLOYMENT INSTRUCTIONS:
-#
-# 1. Install flyctl CLI: https://fly.io/docs/hands-on/install-flyctl/
-# 2. Login: fly auth login
-# 3. Deploy: fly deploy (in backend directory)
-# 4. Check logs: fly logs
-# 5. Monitor usage: fly billing show
-# 6. Set spending cap: fly orgs billing-limits set
-#
-# IMPORTANT NOTES:
-# - This backend uses OpenRouter API (cloud LLM) - no local Ollama needed
-# - OpenRouter API key is pre-configured in config.py
-# - The ChromaDB vector database will be ephemeral (data lost on restart)
-# - For persistent storage, consider using external services or paid volumes
-# - Free tier includes 3 VMs with 256MB RAM each and 160GB transfer/month
-#
-# UPDATING FRONTEND:
-# The Streamlit frontend at ui/app_simple.py is already configured to use:
-# API_BASE_URL = "https://edumate-local.fly.dev/"
-#
-# For Streamlit Cloud deployment:
-# - Point Streamlit Cloud to the main branch
-# - Set the main file path to: ui/app_simple.py
-# - No secrets needed - API URL is hardcoded in app_simple.py
-##############################################################################
