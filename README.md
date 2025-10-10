@@ -2,7 +2,7 @@
 
 An intelligent AI-powered Module Convenor Assistant that provides **personalized academic guidance, feedback, and mentorship** to students. More than just a Q&A bot, EduMate acts as a mini version of your module convenor, understanding course content deeply and offering tailored support.
 
-> 🚀 **[Quick Start - Deploy in 5 Minutes](QUICKSTART.md)** | 📖 **[Full Deployment Guide](STREAMLIT_DEPLOYMENT.md)**
+> 🚀 **[Cloud Deployment Guide](CLOUD_DEPLOYMENT.md)** | 📖 **[Quick Start](QUICKSTART.md)**
 
 ## 🎯 What Makes EduMate Special?
 
@@ -14,6 +14,7 @@ EduMate goes beyond basic document retrieval to provide **intelligent academic g
 - **💡 Tailored Feedback** - Provides structured guidance, not just answers
 - **📚 RAG-Powered** - References actual course materials with citations
 - **🤝 Mentorship Style** - Encouraging, pedagogical, and supportive
+- **☁️ Cloud-Native** - Zero local setup required, $0 base cost
 
 ### Interaction Types
 
@@ -26,42 +27,47 @@ EduMate automatically detects your intent and adapts its response style:
 5. **Progress Feedback** - Constructive support and improvement suggestions
 6. **General Queries** - Course information and quick facts
 
-> 🚀 **[Quick Start - Deploy in 5 Minutes](QUICKSTART.md)** | 📖 **[Full Deployment Guide](STREAMLIT_DEPLOYMENT.md)**
-
 ## Architecture
 
-- **UI**: Streamlit (enhanced chat interface with session management)
-- **Backend**: FastAPI (deployed on Fly.io)
+- **UI**: Streamlit Cloud (free tier)
+- **Backend**: Fly.io (free tier)
 - **Vector DB**: ChromaDB (for document retrieval)
 - **Embeddings**: SentenceTransformers (`all-MiniLM-L6-v2`)
-- **LLM**: OpenRouter API (`gpt-3.5-turbo`)
+- **LLM**: OpenRouter API (pay-as-you-go, ~$0.0015/1K tokens)
 - **Memory**: In-memory conversation tracking with pattern detection
 - **Persona**: Module Convenor prompt system with intent detection
 
-## Live Demo
+## 🚀 Deploy to Cloud (Zero Cost)
 
-- **Frontend**: Deploy on Streamlit Cloud (see deployment guide) or run locally
-- **Backend API**: https://edumate-local.fly.dev
+**For production deployment with zero local setup:**
 
-## 🚀 Deploy to Streamlit Cloud
+Follow the comprehensive [Cloud Deployment Guide](CLOUD_DEPLOYMENT.md) to deploy EduMate using:
+- **Streamlit Cloud** (frontend) - Free tier
+- **Fly.io** (backend) - Free tier
+- **OpenRouter API** (LLM) - Pay-as-you-go
 
-**For easy student access, deploy the frontend to Streamlit Cloud (free tier):**
+Total base cost: **$0/month** + minimal API usage fees
 
-1. Fork this repository
-2. Go to [share.streamlit.io](https://share.streamlit.io)
-3. Click "New app" and select:
-   - Repository: `yourusername/EduMate-local`
-   - Branch: `main`
-   - Main file: `ui/app_simple.py`
-4. Click "Deploy"
+### Quick Deploy Steps
 
-Students can then access your app at `https://your-app-name.streamlit.app` - no login required!
+1. **Get OpenRouter API key** at [openrouter.ai](https://openrouter.ai/) (free credits available)
+2. **Deploy Backend to Fly.io:**
+   ```bash
+   cd backend
+   fly launch --copy-config --yes
+   fly secrets set OPENROUTER_API_KEY=your-key-here
+   fly deploy
+   ```
+3. **Deploy Frontend to Streamlit Cloud:**
+   - Go to [share.streamlit.io](https://share.streamlit.io)
+   - New app → select repo → Main file: `ui/app_simple.py`
+   - Deploy!
 
-📖 **Full deployment guide**: See [STREAMLIT_DEPLOYMENT.md](STREAMLIT_DEPLOYMENT.md) for detailed instructions.
+See full details in [CLOUD_DEPLOYMENT.md](CLOUD_DEPLOYMENT.md)
 
-## Quick Start
+## Quick Start (Local Development)
 
-### Option 1: Run Locally (Development)
+### Option 1: Run Frontend Locally
 
 ```bash
 cd ui
@@ -69,45 +75,65 @@ pip install -r requirements.txt
 streamlit run app_simple.py
 ```
 
-The UI is pre-configured to connect to the Fly.io backend at `https://edumate-local.fly.dev`
+The UI will connect to the cloud backend at `https://edumate-local.fly.dev` (or set `EDUMATE_API_BASE` env var)
 
-### Option 2: Deploy to Streamlit Cloud (Production)
+### Option 2: Run Full Stack Locally
 
-For easy student access, deploy the frontend to Streamlit Cloud:
-
-1. Go to [share.streamlit.io](https://share.streamlit.io)
-2. Click "New app" and configure:
-   - Repository: Your fork of this repo
-   - Branch: `main`
-   - Main file: `ui/app_simple.py`
-3. Click "Deploy"
-
-See [STREAMLIT_DEPLOYMENT.md](STREAMLIT_DEPLOYMENT.md) for detailed instructions.
-
-### Deploy Backend to Fly.io
-
-If you need to redeploy the backend:
-
+**Backend:**
 ```bash
 cd backend
-fly deploy
+pip install -r requirements.txt
+
+# Set your OpenRouter API key
+export OPENROUTER_API_KEY=sk-or-v1-your-key-here
+
+# Optional: Ingest documents
+python ingest.py
+
+# Start backend
+uvicorn main:app --reload --port 8000
 ```
 
-The backend is configured with:
-- OpenRouter API key (pre-configured)
-- Fast Mode enabled (4-6 second responses)
-- GPT-3.5-turbo model
+**Frontend:**
+```bash
+cd ui
+export EDUMATE_API_BASE=http://localhost:8000
+streamlit run app_simple.py
+```
 
 ## Configuration
 
-The app is pre-configured for OpenRouter. Configuration in `backend/config.py`:
+### Environment Variables
 
-- `USE_OPENAI=1` - Uses OpenRouter by default
-- `OPENAI_API_KEY` - Pre-configured API key
-- `OPENAI_MODEL=openai/gpt-3.5-turbo` - Default model
-- `FAST_MODE=1` - Optimized for speed
-- `ENABLE_CONVERSATION_MEMORY=1` - Context-aware conversations
-- `MAX_CONVERSATION_HISTORY=10` - Number of turns to remember
+Set these in your deployment environment:
+
+**Required:**
+- `OPENROUTER_API_KEY` - Your OpenRouter API key (get from openrouter.ai)
+
+**Optional (with defaults):**
+- `OPENROUTER_MODEL` - Model to use (default: `openai/gpt-3.5-turbo`)
+- `OPENROUTER_BASE_URL` - API base URL (default: `https://openrouter.ai/api/v1`)
+- `FAST_MODE` - Enable fast mode (default: `1`)
+- `TEMP` - LLM temperature (default: `0.3`)
+- `NUM_PREDICT` - Max tokens (default: `400`)
+- `ENABLE_CONVERSATION_MEMORY` - Enable context (default: `1`)
+- `MAX_CONVERSATION_HISTORY` - Conversation turns (default: `10`)
+
+### Backend Configuration
+
+See `backend/config.py` for all available options.
+
+### Frontend Configuration  
+
+Update API URL in `ui/app_simple.py`:
+```python
+DEFAULT_API_BASE = "https://your-backend.fly.dev"
+```
+
+Or set environment variable:
+```bash
+export EDUMATE_API_BASE=https://your-backend.fly.dev
+```
 
 ## Adding Documents
 
@@ -132,46 +158,122 @@ This will build the vector index from your documents.
 6. **Conversation memory** tracks context for follow-up questions
 7. **Answer displayed** in UI with source citations and suggestions
 
-## 💰 Free Tier & Cost Management
+## 💰 Cost Breakdown
 
 This setup uses free tiers to minimize costs:
 
 ### Streamlit Cloud (Free Tier)
 - ✅ 1 private app or unlimited public apps
-- ✅ 1 GB RAM
+- ✅ 1 GB RAM per app
 - ✅ Unlimited viewers
 - **Cost**: $0/month
 
 ### Fly.io (Free Tier)
-- ✅ 3 VMs with 256MB RAM
-- ✅ 160GB data transfer/month
+- ✅ 3 shared-cpu-1x VMs with 256MB RAM
+- ✅ 160GB outbound data transfer/month
 - ✅ Auto-stop when idle (configured)
+- ✅ Scales to zero when not in use
 - **Cost**: $0/month for typical usage
 
-### OpenRouter API
-- ✅ Pay-per-use only
+### OpenRouter API (Pay-as-you-go)
+- ✅ No subscription or base fee
 - ✅ GPT-3.5-turbo: ~$0.0015 per 1,000 tokens
+- ✅ Free models available (with rate limits)
 - ✅ Example: 1,000 student questions ≈ $3-5
-- **Cost**: Only when students use it
+- **Cost**: Only pay for what you use
 
 **Total**: $0 base cost + minimal API usage fees
 
 ### Set Spending Limits
 ```bash
 # Fly.io spending cap (recommended)
-fly orgs billing-limits set
+fly orgs billing-limits set --max-monthly-spend 5
 
 # Monitor usage
 fly billing show
 ```
 
+### Use Free Models (Optional)
+
+OpenRouter offers free models with rate limits:
+- `meta-llama/llama-3.1-8b-instruct:free`
+- `mistralai/mistral-7b-instruct:free`
+
+Update in `backend/fly.toml` or set via:
+```bash
+fly secrets set OPENROUTER_MODEL=meta-llama/llama-3.1-8b-instruct:free
+```
+
 ## 📖 Documentation
 
-- **[QUICKSTART.md](QUICKSTART.md)** - ⚡ Deploy in 5 minutes
-- **[STREAMLIT_DEPLOYMENT.md](STREAMLIT_DEPLOYMENT.md)** - Complete deployment guide for Streamlit Cloud + Fly.io
+- **[CLOUD_DEPLOYMENT.md](CLOUD_DEPLOYMENT.md)** - ⭐ Complete cloud deployment guide
+- **[QUICKSTART.md](QUICKSTART.md)** - ⚡ Quick start guide
+- **[STREAMLIT_DEPLOYMENT.md](STREAMLIT_DEPLOYMENT.md)** - Legacy deployment guide
 - **[SETUP.md](SETUP.md)** - Configuration details
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture
-- **[VERIFICATION.md](VERIFICATION.md)** - Verification steps
+- **[MODULE_CONVENOR_GUIDE.md](MODULE_CONVENOR_GUIDE.md)** - Feature guide
 
+## 🔧 Advanced Features
 
+### Add Course Materials
 
+1. Place documents in `backend/corpus/` (PDF, DOCX, PPTX, TXT, HTML)
+2. Run ingestion:
+   ```bash
+   cd backend
+   python ingest.py
+   ```
+3. Redeploy:
+   ```bash
+   fly deploy
+   ```
+
+### Conversation Memory
+
+EduMate maintains conversation context automatically:
+- Tracks up to 10 conversation turns
+- Detects patterns (struggling students, repeated topics)
+- Privacy-preserving (in-memory only)
+
+### Custom Prompts
+
+Modify the Module Convenor persona in `backend/persona.py` to customize:
+- Teaching style
+- Response format
+- Domain-specific guidance
+
+## 🆘 Troubleshooting
+
+See [CLOUD_DEPLOYMENT.md](CLOUD_DEPLOYMENT.md#-monitoring--troubleshooting) for comprehensive troubleshooting guide.
+
+**Common Issues:**
+
+1. **Backend offline**: Check `fly status` and `fly logs`
+2. **API key errors**: Verify `fly secrets list` shows OPENROUTER_API_KEY
+3. **High costs**: Switch to free model or set spending limits
+4. **Slow responses**: Check Fly.io machine is running, may need to warm up
+
+## 🤝 Contributing
+
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+## 📄 License
+
+[Add your license here]
+
+## 🙏 Acknowledgments
+
+Built with:
+- [Streamlit](https://streamlit.io/) - Web UI framework
+- [FastAPI](https://fastapi.tiangolo.com/) - Backend framework
+- [ChromaDB](https://www.trychroma.com/) - Vector database
+- [OpenRouter](https://openrouter.ai/) - LLM API aggregator
+- [Fly.io](https://fly.io/) - Cloud hosting
+
+---
+
+**Ready to deploy?** Start with the [Cloud Deployment Guide](CLOUD_DEPLOYMENT.md) 🚀

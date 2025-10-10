@@ -1,33 +1,49 @@
-cat > backend/fly.toml << "a"
 # fly.toml — EduMate Backend (FastAPI/Uvicorn)
+# Cloud-native deployment configuration for Fly.io
 
-app = "edumate-local"            # <--- change if taken (also update your Streamlit API base URL)
-primary_region = "lhr"           # London (pick your nearest: lhr, iad, syd, etc.)
+app = "edumate-local"            # Change if taken (also update Streamlit API base URL)
+primary_region = "lhr"           # London (pick nearest: lhr, iad, syd, etc.)
 
-# Optional env that your app expects. Do NOT put secrets here.
+# Environment variables (non-sensitive)
 [env]
-  PORT = "8080"                  # uvicorn will listen on this port
+  PORT = "8080"
+  FAST_MODE = "1"
+  MAX_ACTIVE_GENERATIONS = "1"
+  TEMP = "0.3"
+  NUM_PREDICT = "400"
+  ENABLE_CONVERSATION_MEMORY = "1"
+  MAX_CONVERSATION_HISTORY = "10"
+  OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+  OPENROUTER_MODEL = "openai/gpt-3.5-turbo"
+  OPENROUTER_APP_NAME = "EduMate"
 
-# We’re using the Dockerfile in this folder (backend/)
+# IMPORTANT: Set secrets via CLI (not in this file!)
+# fly secrets set OPENROUTER_API_KEY=your-api-key-here
+
+# Use Dockerfile in backend/
 [build]
   dockerfile = "Dockerfile"
 
-# Modern Machines config for HTTP apps
+# HTTP service configuration (Fly.io v2)
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_start_machines = true     # wake on request
-  auto_stop_machines = true      # sleep when idle (saves free-tier minutes)
-  min_machines_running = 0
-  concurrency = { type = "requests", soft_limit = 5, hard_limit = 10 }
+  auto_start_machines = true     # Wake on request
+  auto_stop_machines = true      # Sleep when idle (saves costs)
+  min_machines_running = 0       # Scale to zero when idle
+  
+  # Concurrency limits
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 5
+    hard_limit = 10
 
-# Simple health check (FastAPI should serve GET /health with 200 OK)
-[checks]
-  [checks.health]
-    type = "http"
-    port = 8080
-    method = "get"
-    path = "/health"
-    interval = "15s"
-    timeout  = "2s"
-
+# Health check endpoint
+[[checks]]
+  type = "http"
+  port = 8080
+  method = "get"
+  path = "/health"
+  interval = "15s"
+  timeout = "2s"
+  grace_period = "10s"
