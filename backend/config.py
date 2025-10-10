@@ -53,54 +53,24 @@ HYDE         = False    # keep off until everything is stable
 MULTI_QUERY  = False    # re-enable later for recall
 
 # -----------------------
-# LLM Provider Configuration
+# LLM Provider Configuration - OpenRouter Only
 # -----------------------
-# USE_OPENAI: Toggle between OpenRouter (cloud) and Ollama (local)
-#   - USE_OPENAI=1 → Use OpenRouter (OpenAI-compatible API)
-#   - USE_OPENAI=0 or unset → Use local Ollama (default)
-USE_OPENAI = os.getenv("USE_OPENAI", "1") == "1"
-
-# -----------------------
-# OpenRouter Configuration (USE_OPENAI=1)
-# -----------------------
-# OpenRouter is OpenAI-compatible, uses the OpenAI SDK
-# Set OPENAI_API_KEY environment variable with your OpenRouter API key
-# Base URL: https://openrouter.ai/api/v1
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "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")
-OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "openai/gpt-3.5-turbo")
-
-# -----------------------
-# Ollama Configuration (USE_OPENAI=0)
-# -----------------------
-# OLLAMA_HOST Configuration Guide:
-# 
-# 1. LOCAL DEVELOPMENT (non-Docker):
-#    - Use: http://localhost:11434
-#    - Ollama must be running on your local machine
-#    - Default if no environment variable is set
+# This app is configured for cloud deployment using OpenRouter API
+# No local LLM setup required - zero-cost deployment ready
 #
-# 2. DOCKER DEPLOYMENTS:
-#    - Use: http://ollama:11434
-#    - Set in docker-compose.yml (container-to-container communication)
-#    - The 'ollama' hostname resolves to the Ollama container
-#
-# 3. CLOUD/PUBLIC API DEPLOYMENTS (Fly.io, Streamlit Cloud, etc.):
-#    - Use: Your assigned public Ollama API endpoint
-#    - Examples: https://api.ollama.ai, https://your-ollama-instance.com
-#    - Set OLLAMA_HOST or OLLAMA_URL environment variable to the public endpoint
-#    - Do NOT use localhost in cloud deployments - it won't work
-#    - May require API key authentication (check your provider's documentation)
-#
-# The code tries OLLAMA_URL first (used in .env.example), then OLLAMA_HOST,
-# then defaults to http://localhost:11434 for local development convenience.
+# Set OPENROUTER_API_KEY environment variable with your API key
+# Get free credits at: https://openrouter.ai/
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+if not OPENROUTER_API_KEY:
+    raise ValueError(
+        "OPENROUTER_API_KEY environment variable is required. "
+        "Get your free API key at https://openrouter.ai/"
+    )
 
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
-OLLAMA_HOST = os.getenv("OLLAMA_URL", os.getenv("OLLAMA_HOST", "http://localhost:11434"))
-
-# Validate OLLAMA_HOST is not empty when using Ollama
-if not USE_OPENAI and not OLLAMA_HOST:
-    raise ValueError("OLLAMA_HOST must be set when USE_OPENAI=0. Set OLLAMA_HOST or OLLAMA_URL environment variable.")
+OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-3.5-turbo")
+OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "")  # optional: your site/app URL
+OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "EduMate")
 
 # Generation controls (balanced for quality and speed)
 # Reduced to 400 for faster responses (4-6 seconds target)
@@ -118,15 +88,3 @@ MAX_CONVERSATION_HISTORY = int(os.getenv("MAX_CONVERSATION_HISTORY", "10"))
 
 # Enable conversation memory for context-aware responses
 ENABLE_CONVERSATION_MEMORY = os.getenv("ENABLE_CONVERSATION_MEMORY", "1") == "1"
-
-
-
-
-# === Cloud LLM config ===
-USE_OPENROUTER = bool(int(os.getenv("USE_OPENROUTER", "1")))  # 1 = use cloud by default
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "mistralai/mistral-7b-instruct")
-OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "")  # optional: your site/app URL
-OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "EduMate")
-

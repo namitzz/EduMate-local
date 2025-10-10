@@ -74,18 +74,17 @@ def get_error_message(error_type: ErrorType, sources: List[str] = None, error_de
                 pass
         
         return (
-            "Unable to connect to the AI model (Ollama).\n\n"
+            "Unable to connect to the AI model (OpenRouter API).\n\n"
             "**Possible causes:**\n"
-            "• Ollama service is not running\n"
-            "• Connection to Ollama was refused\n"
-            "• Wrong OLLAMA_HOST configuration for your deployment type\n\n"
+            "• OpenRouter service is temporarily unavailable\n"
+            "• Network connectivity issues\n"
+            "• Invalid API key or authentication failure\n\n"
             "**What to do:**\n"
-            "• For local development: Ensure Ollama is running (`ollama list`)\n"
-            "• For Docker: Verify the ollama container is running\n"
-            "• For cloud/public API: Check OLLAMA_HOST is set to your public endpoint\n"
-            "  (e.g., https://api.ollama.ai, NOT localhost)\n"
-            "• Verify OLLAMA_HOST/OLLAMA_URL environment variable is correct\n"
-            "• Check if your API endpoint requires authentication"
+            "• Check your internet connection\n"
+            "• Verify OPENROUTER_API_KEY is set correctly\n"
+            "• Check OpenRouter status at https://openrouter.ai/status\n"
+            "• Try again in a moment\n"
+            "• Contact support if the issue persists"
             f"{url_info}"
         )
     
@@ -120,7 +119,7 @@ def get_error_message(error_type: ErrorType, sources: List[str] = None, error_de
                 "**What to do:**\n"
                 "• Try asking your question again\n"
                 "• Rephrase your question more clearly\n"
-                "• Check if Ollama is working: `ollama run mistral 'test'`\n"
+                "• Wait a moment and try again\n"
                 "• Restart the backend server if the issue persists"
             )
     
