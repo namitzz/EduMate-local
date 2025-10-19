@@ -50,56 +50,204 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for enhanced UI
+# Custom CSS for enhanced UI with modern design
 st.markdown("""
     <style>
-    /* Main chat container */
+    /* Import modern font */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    /* Global font */
+    * {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    
+    /* Main app background */
+    .main {
+        background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+    }
+    
+    /* Chat messages */
     .stChatMessage {
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-    }
-    
-    /* Success/error messages */
-    .stSuccess, .stError, .stWarning, .stInfo {
-        border-radius: 0.5rem;
-        padding: 0.75rem;
-    }
-    
-    /* Button styling */
-    .stButton > button {
-        border-radius: 0.5rem;
-        font-weight: 500;
+        padding: 1.25rem;
+        border-radius: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         transition: all 0.3s ease;
+    }
+    
+    .stChatMessage:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        transform: translateY(-2px);
+    }
+    
+    /* User message styling */
+    [data-testid="stChatMessageContent"][data-message-author="user"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    /* Assistant message styling */
+    [data-testid="stChatMessageContent"][data-message-author="assistant"] {
+        background: white;
+        border-left: 4px solid #4CAF50;
+    }
+    
+    /* Success/error messages with modern design */
+    .stSuccess {
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        border-left: 4px solid #28a745;
+        border-radius: 0.75rem;
+        padding: 1rem;
+    }
+    
+    .stError {
+        background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+        border-left: 4px solid #dc3545;
+        border-radius: 0.75rem;
+        padding: 1rem;
+    }
+    
+    .stWarning {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
+        border-left: 4px solid #ffc107;
+        border-radius: 0.75rem;
+        padding: 1rem;
+    }
+    
+    .stInfo {
+        background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+        border-left: 4px solid #17a2b8;
+        border-radius: 0.75rem;
+        padding: 1rem;
+    }
+    
+    /* Enhanced button styling */
+    .stButton > button {
+        border-radius: 0.75rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 0.5rem 1.5rem;
     }
     
     .stButton > button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+        border-color: #667eea;
+    }
+    
+    /* Secondary button styling */
+    .stButton > button[kind="secondary"] {
+        background: white;
+        color: #667eea;
+        border: 2px solid #667eea;
+    }
+    
+    .stButton > button[kind="secondary"]:hover {
+        background: #667eea;
+        color: white;
     }
     
     /* Sidebar styling */
-    .css-1d391kg {
-        padding: 2rem 1rem;
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%);
+        border-right: 1px solid #e9ecef;
     }
     
-    /* Chat input */
-    .stChatInput > div > div {
-        border-radius: 0.5rem;
+    [data-testid="stSidebar"] .stButton > button {
+        width: 100%;
     }
     
-    /* Headers */
+    /* Chat input with modern design */
+    .stChatInput > div {
+        border-radius: 1rem;
+        border: 2px solid #e9ecef;
+        transition: all 0.3s ease;
+    }
+    
+    .stChatInput > div:focus-within {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    /* Main title with gradient */
     h1 {
         font-weight: 700;
-        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 0.5rem;
     }
     
-    /* Caption */
+    /* Section headers */
+    h2, h3 {
+        color: #2c3e50;
+        font-weight: 600;
+    }
+    
+    /* Caption styling */
     .caption {
-        color: #666;
+        color: #6c757d;
         font-size: 0.9rem;
+        line-height: 1.6;
+    }
+    
+    /* Expander styling */
+    .streamlit-expanderHeader {
+        background: #f8f9fa;
+        border-radius: 0.5rem;
+        font-weight: 500;
+    }
+    
+    /* Divider */
+    hr {
+        margin: 2rem 0;
+        border: none;
+        border-top: 2px solid #e9ecef;
+    }
+    
+    /* Link styling */
+    a {
+        color: #667eea;
+        text-decoration: none;
+        transition: color 0.3s ease;
+    }
+    
+    a:hover {
+        color: #764ba2;
+        text-decoration: underline;
+    }
+    
+    /* Code blocks */
+    code {
+        background: #f8f9fa;
+        padding: 0.2rem 0.4rem;
+        border-radius: 0.25rem;
+        color: #e83e8c;
+        font-size: 0.875em;
+    }
+    
+    /* Status badges */
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin: 0.25rem 0;
+    }
+    
+    .status-online {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .status-offline {
+        background: #f8d7da;
+        color: #721c24;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -116,15 +264,22 @@ if "messages" not in st.session_state:
         {
             "role": "assistant",
             "content": (
-                "👋 Hello! I'm your **AI Module Convenor Assistant**.\\n\\n"
-                "I'm here to provide personalized academic guidance and support. I can help you with:\\n\\n"
-                "• **Understanding Concepts** - Clarify theories and course material\\n"
-                "• **Assignment Guidance** - Structure, approach, and rubric interpretation\\n"
-                "• **Exam Preparation** - Study strategies and topic prioritization\\n"
-                "• **Study Planning** - Time management and learning techniques\\n"
-                "• **Progress Feedback** - Constructive advice and improvement suggestions\\n\\n"
-                "💡 **Tip**: I maintain conversation context, so feel free to ask follow-up questions!\\n\\n"
-                "What would you like to work on today?"
+                "# 👋 Welcome to EduMate!\n\n"
+                "I'm your **AI Module Convenor Assistant** - here to provide personalized academic guidance and support.\n\n"
+                "## 🎯 How I Can Help You\n\n"
+                "### 📚 Understanding Concepts\n"
+                "Get clear explanations of theories and course material with practical examples.\n\n"
+                "### 📝 Assignment Guidance\n"
+                "Receive structured guidance on coursework, rubric interpretation, and approach strategies.\n\n"
+                "### 📖 Exam Preparation\n"
+                "Learn effective study strategies, topic prioritization, and preparation techniques.\n\n"
+                "### ⏰ Study Planning\n"
+                "Optimize your time management and discover proven learning techniques.\n\n"
+                "### 💬 Progress Feedback\n"
+                "Get constructive advice and personalized improvement suggestions.\n\n"
+                "---\n\n"
+                "💡 **Pro Tip**: I remember our conversation, so feel free to ask follow-up questions and dive deeper into topics!\n\n"
+                "✨ **Ready to get started?** Ask me anything about your coursework!"
             ),
         }
     ]
@@ -136,16 +291,26 @@ if "api_status" not in st.session_state:
 # Header & Controls
 # ============================================================================
 
-col_title, col_btn = st.columns([4, 1])
-with col_title:
-    st.title("🎓 EduMate")
-    st.markdown('<p class="caption">AI Module Convenor Assistant • Personalized Academic Guidance</p>', 
-                unsafe_allow_html=True)
-with col_btn:
-    st.write("")  # Spacer
-    if st.button("🔄", help="Start a new conversation", use_container_width=True):
+# Create a modern header with controls
+st.markdown("""
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+        <div>
+            <h1 style="margin: 0;">🎓 EduMate</h1>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
+
+col_subtitle, col_new_chat = st.columns([5, 1])
+with col_subtitle:
+    st.markdown(
+        '<p style="color: #6c757d; font-size: 1.1rem; margin-top: -1rem; margin-bottom: 1rem;">💡 Your AI Module Convenor • Personalized Academic Guidance</p>', 
+        unsafe_allow_html=True
+    )
+with col_new_chat:
+    if st.button("🔄 New Chat", help="Start a fresh conversation", use_container_width=True, type="primary"):
         st.session_state.messages = [st.session_state.messages[0]]  # keep only welcome message
         st.session_state.session_id = str(uuid.uuid4())
+        st.success("✨ New conversation started!")
         st.rerun()
 
 st.divider()
@@ -162,7 +327,7 @@ for message in st.session_state.messages:
 # Chat Input and Response
 # ============================================================================
 
-if user_input := st.chat_input("💬 Ask me anything about your course..."):
+if user_input := st.chat_input("💬 Ask me anything about your course... (e.g., 'Explain the concept of...' or 'Help me with my assignment on...')"):
     # Add user message
     st.session_state.messages.append({"role": "user", "content": user_input})
 
@@ -190,13 +355,16 @@ if user_input := st.chat_input("💬 Ask me anything about your course..."):
                 st.markdown(answer)
 
                 if sources:
-                    with st.expander("📚 View Sources", expanded=False):
+                    st.markdown("---")
+                    with st.expander("📚 **View Sources & References**", expanded=False):
+                        st.markdown("*These sources were used to generate the response:*")
+                        st.markdown("")
                         for i, s in enumerate(sources, 1):
-                            # Turn plain URLs into clickable links
+                            # Turn plain URLs into clickable links with better formatting
                             if isinstance(s, str) and (s.startswith("http://") or s.startswith("https://")):
-                                st.markdown(f"{i}. [{s}]({s})")
+                                st.markdown(f"**{i}.** 🔗 [{s}]({s})")
                             else:
-                                st.markdown(f"{i}. {s}")
+                                st.markdown(f"**{i}.** 📄 {s}")
 
                 # Persist assistant reply
                 st.session_state.messages.append({"role": "assistant", "content": answer})
@@ -204,16 +372,18 @@ if user_input := st.chat_input("💬 Ask me anything about your course..."):
 
             except requests.exceptions.ConnectionError:
                 error_msg = (
-                    f"❌ **Connection Error**\\n\\n"
-                    f"Cannot connect to the backend API at `{API_BASE_URL}`.\\n\\n"
-                    f"**Possible causes:**\\n"
-                    f"• Backend server is not running\\n"
-                    f"• Incorrect API URL\\n"
-                    f"• Network connectivity issues\\n\\n"
-                    f"**What to do:**\\n"
-                    f"• Check if the backend is deployed and running\\n"
-                    f"• Verify the API URL in the sidebar\\n"
-                    f"• Try again in a moment"
+                    "## ❌ Connection Error\n\n"
+                    f"Cannot connect to the backend API at:\n\n"
+                    f"`{API_BASE_URL}`\n\n"
+                    "### 🔍 Possible Causes\n"
+                    "- Backend server is not running or unavailable\n"
+                    "- Incorrect API URL configuration\n"
+                    "- Network connectivity issues\n\n"
+                    "### 💡 What You Can Do\n"
+                    "1. Check if the backend is deployed and running\n"
+                    "2. Verify the API URL in the sidebar\n"
+                    "3. Wait a moment and try again\n"
+                    "4. Contact support if the issue persists"
                 )
                 st.error(error_msg)
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
@@ -221,12 +391,13 @@ if user_input := st.chat_input("💬 Ask me anything about your course..."):
 
             except requests.exceptions.Timeout:
                 error_msg = (
-                    "⏱️ **Request Timeout**\\n\\n"
-                    "The request took too long to complete (>120 seconds).\\n\\n"
-                    "**What to do:**\\n"
-                    "• Try asking a simpler question\\n"
-                    "• Wait a moment and try again\\n"
-                    "• The backend may be warming up after being idle"
+                    "## ⏱️ Request Timeout\n\n"
+                    "The request took too long to complete (>120 seconds).\n\n"
+                    "### 💡 What You Can Do\n"
+                    "1. Try asking a simpler or more specific question\n"
+                    "2. Wait a moment and try again\n"
+                    "3. The backend may be warming up after being idle\n"
+                    "4. Check your internet connection"
                 )
                 st.warning(error_msg)
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
@@ -237,13 +408,14 @@ if user_input := st.chat_input("💬 Ask me anything about your course..."):
                 except Exception:
                     detail = ""
                 error_msg = (
-                    f"❌ **API Error ({e.response.status_code})**\\n\\n"
-                    f"The backend returned an error.\\n\\n"
-                    f"**Details:** {detail if detail else 'No additional information'}\\n\\n"
-                    f"**What to do:**\\n"
-                    f"• Try rephrasing your question\\n"
-                    f"• Check backend logs for more details\\n"
-                    f"• Contact support if the issue persists"
+                    f"## ❌ API Error (Status: {e.response.status_code})\n\n"
+                    f"The backend returned an error.\n\n"
+                    f"**Details:** {detail if detail else 'No additional information available'}\n\n"
+                    "### 💡 What You Can Do\n"
+                    "1. Try rephrasing your question\n"
+                    "2. Check backend logs for more details\n"
+                    "3. Wait a moment and try again\n"
+                    "4. Contact support if the issue persists"
                 )
                 st.error(error_msg)
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
@@ -251,12 +423,13 @@ if user_input := st.chat_input("💬 Ask me anything about your course..."):
 
             except Exception as e:
                 error_msg = (
-                    f"❌ **Unexpected Error**\\n\\n"
-                    f"Something went wrong: {str(e)}\\n\\n"
-                    f"**What to do:**\\n"
-                    f"• Try again\\n"
-                    f"• Refresh the page if the issue persists\\n"
-                    f"• Report this error if it continues"
+                    "## ❌ Unexpected Error\n\n"
+                    f"Something went wrong:\n\n"
+                    f"```\n{str(e)}\n```\n\n"
+                    "### 💡 What You Can Do\n"
+                    "1. Try your question again\n"
+                    "2. Refresh the page if the issue persists\n"
+                    "3. Contact support and report this error"
                 )
                 st.error(error_msg)
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
@@ -266,65 +439,109 @@ if user_input := st.chat_input("💬 Ask me anything about your course..."):
 # ============================================================================
 
 with st.sidebar:
-    st.header("ℹ️ About EduMate")
-    st.markdown(
-        """
-**EduMate** is an AI-powered Module Convenor Assistant that provides 
-intelligent academic guidance and mentorship.
+    st.markdown("## 📚 EduMate Assistant")
+    st.markdown("*Your AI-Powered Academic Guide*")
+    
+    st.divider()
+    
+    # About section with better formatting
+    with st.expander("ℹ️ **About EduMate**", expanded=False):
+        st.markdown(
+            """
+**EduMate** is an intelligent AI assistant that acts as your personal 
+module convenor, providing tailored academic guidance and mentorship.
 
-### 🎯 What I Can Help With
-- 📖 **Concept Clarification** — Understand course material  
-- 📝 **Assignment Guidance** — Structure and approach  
-- 📚 **Exam Preparation** — Study strategies  
-- ⏱️ **Study Planning** — Time management  
-- 💬 **Progress Support** — Constructive feedback  
+### 🌟 Why Choose EduMate?
 
-### ✨ Key Features
-- 🧠 **Context-Aware** — I remember our conversation  
-- 📚 **Source-Based** — References actual course documents  
-- 🎓 **Academic Focus** — Educational best practices  
-- 🔒 **Privacy-First** — Anonymized sessions  
+- 🧠 **Smart Context Awareness** — Remembers your conversation
+- 📚 **Evidence-Based Answers** — Cites actual course documents
+- 🎓 **Academic Excellence** — Follows educational best practices
+- 🔒 **Privacy Protected** — Fully anonymized sessions
+- ⚡ **Always Available** — 24/7 academic support
 """
-    )
+        )
+    
+    st.divider()
+
+    # What I Can Help With section
+    with st.expander("🎯 **What I Can Help With**", expanded=True):
+        st.markdown(
+            """
+**Concept Clarification**
+> Understand complex theories and course material
+
+**Assignment Support**
+> Get guidance on structure and approach
+
+**Exam Strategies**
+> Learn effective study techniques
+
+**Time Management**
+> Optimize your study planning
+
+**Academic Feedback**
+> Receive constructive improvement tips
+"""
+        )
 
     st.divider()
 
-    st.subheader("🔧 System Status")
+    # System Status with improved design
+    st.markdown("### 🔧 System Status")
     
-    # API Status Check
-    status_placeholder = st.empty()
+    status_col1, status_col2 = st.columns([1, 3])
+    
     try:
         health_response = requests.get(api("/health"), timeout=5)
         if health_response.status_code == 200:
-            status_placeholder.success("✅ Backend API: Online")
+            with status_col1:
+                st.markdown("✅")
+            with status_col2:
+                st.markdown("**Backend Online**")
             st.session_state.api_status = "online"
         else:
-            status_placeholder.warning(f"⚠️ Backend API: Status {health_response.status_code}")
+            with status_col1:
+                st.markdown("⚠️")
+            with status_col2:
+                st.markdown(f"**Status {health_response.status_code}**")
             st.session_state.api_status = "warning"
     except requests.exceptions.Timeout:
-        status_placeholder.error("⏱️ Backend API: Timeout")
+        with status_col1:
+            st.markdown("⏱️")
+        with status_col2:
+            st.markdown("**Timeout**")
         st.session_state.api_status = "timeout"
     except Exception:
-        status_placeholder.error("❌ Backend API: Offline")
+        with status_col1:
+            st.markdown("❌")
+        with status_col2:
+            st.markdown("**Offline**")
         st.session_state.api_status = "offline"
 
-    st.caption(f"**API URL:** `{API_BASE_URL}`")
+    st.caption(f"🌐 API: `{API_BASE_URL[:30]}...`" if len(API_BASE_URL) > 30 else f"🌐 API: `{API_BASE_URL}`")
     
     st.divider()
 
-    st.subheader("💬 Session Info")
-    st.caption(f"**Session ID:** `{st.session_state.session_id[:8]}...`")
-    st.caption(f"**Messages:** {len(st.session_state.messages)}")
+    # Session Info
+    st.markdown("### 💬 Current Session")
+    
+    info_col1, info_col2 = st.columns(2)
+    with info_col1:
+        st.metric("Messages", len(st.session_state.messages))
+    with info_col2:
+        st.metric("Session", f"#{st.session_state.session_id[:8]}")
     
     st.divider()
 
-    if st.button("🗑️ Clear Chat History", use_container_width=True, type="secondary"):
+    # Action buttons with better design
+    if st.button("🗑️ Clear Chat", use_container_width=True, type="secondary"):
         st.session_state.messages = [
             {
                 "role": "assistant",
                 "content": (
-                    "👋 Hello! I'm your **AI Module Convenor Assistant**. "
-                    "I can help you with course concepts, assignments, exam prep, and study planning. "
+                    "# 👋 Welcome Back!\n\n"
+                    "I'm your **AI Module Convenor Assistant**. "
+                    "I can help you with course concepts, assignments, exam prep, and study planning.\n\n"
                     "What would you like to work on today?"
                 ),
             }
@@ -334,27 +551,37 @@ intelligent academic guidance and mentorship.
 
     st.divider()
 
-    st.caption("### 📖 Quick Tips")
-    st.caption(
-        """
-- Ask questions naturally about your coursework  
-- Request specific guidance on assignments  
-- Get study strategies for exams  
-- Ask follow-up questions for deeper understanding  
-- Check sources for more details
+    # Quick Tips
+    with st.expander("💡 **Quick Tips**", expanded=False):
+        st.markdown(
+            """
+- 🎯 Ask specific questions about your coursework
+- 📝 Request detailed guidance on assignments
+- 📚 Get comprehensive exam preparation strategies
+- 🔄 Ask follow-up questions for deeper understanding
+- 📖 Check sources in the expandable section below answers
 """
-    )
+        )
 
     st.divider()
 
-    st.caption("### 🚀 Powered By")
-    st.caption(
-        """
-- **Frontend:** Streamlit Cloud  
-- **Backend:** Fly.io  
-- **LLM:** OpenRouter API  
-- **Embeddings:** SentenceTransformers  
+    # Technology stack
+    with st.expander("🚀 **Powered By**", expanded=False):
+        st.markdown(
+            """
+**Frontend**
+- Streamlit Cloud (Free Tier)
 
-**Zero local setup • $0 base cost**
+**Backend**
+- Fly.io (Free Tier)
+- FastAPI & Uvicorn
+
+**AI & ML**
+- OpenRouter API (GPT-3.5)
+- SentenceTransformers
+- ChromaDB Vector Database
+
+**💰 Total Cost: $0/month base**
+*(Pay only for API usage)*
 """
-    )
+        )
