@@ -80,16 +80,9 @@ st.markdown("""
         transform: translateY(-2px);
     }
     
-    /* User message styling */
-    [data-testid="stChatMessageContent"][data-message-author="user"] {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-    }
-    
-    /* Assistant message styling */
-    [data-testid="stChatMessageContent"][data-message-author="assistant"] {
+    /* Chat message styling - keeping simple for compatibility */
+    .stChatMessage {
         background: white;
-        border-left: 4px solid #4CAF50;
     }
     
     /* Success/error messages with modern design */
@@ -127,27 +120,11 @@ st.markdown("""
         font-weight: 600;
         transition: all 0.3s ease;
         border: 2px solid transparent;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 0.5rem 1.5rem;
     }
     
     .stButton > button:hover {
         transform: translateY(-2px);
         box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
-        border-color: #667eea;
-    }
-    
-    /* Secondary button styling */
-    .stButton > button[kind="secondary"] {
-        background: white;
-        color: #667eea;
-        border: 2px solid #667eea;
-    }
-    
-    .stButton > button[kind="secondary"]:hover {
-        background: #667eea;
-        color: white;
     }
     
     /* Sidebar styling */
@@ -195,11 +172,12 @@ st.markdown("""
         line-height: 1.6;
     }
     
-    /* Expander styling */
-    .streamlit-expanderHeader {
+    /* Expander styling - using more stable selectors */
+    details > summary {
         background: #f8f9fa;
         border-radius: 0.5rem;
         font-weight: 500;
+        padding: 0.75rem;
     }
     
     /* Divider */
