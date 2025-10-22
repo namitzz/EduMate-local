@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  edumate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount repository for live code editing during development
+      - ./backend:/app/backend
+      - ./app:/app/app
+      - ./ui/build:/app/ui/build
+      - ./models:/app/models
+    environment:
+      # Required: OpenRouter API key for LLM access
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      # Optional: Override model path
+      - MODEL_PATH=${MODEL_PATH:-/app/models}
+      # Optional: Configure OpenRouter settings
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-openai/gpt-3.5-turbo}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      # Optional: Performance tuning
+      - FAST_MODE=${FAST_MODE:-1}
+      - MAX_ACTIVE_GENERATIONS=${MAX_ACTIVE_GENERATIONS:-1}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
