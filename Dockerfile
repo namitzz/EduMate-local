@@ -21,13 +21,16 @@ COPY backend/ ./backend/
 # Copy app wrapper
 COPY app/ ./app/
 
-# Copy UI build (if present)
-# The ui/build folder should contain the built static files
-COPY ui/build/ ./ui/build/ 2>/dev/null || mkdir -p ./ui/build
+# Create directories for UI and models (will be populated if present in context)
+RUN mkdir -p ./ui/build ./models
 
-# Copy model folder (if present)
+# Copy UI build (optional - create empty .gitkeep if ui/build doesn't exist)
+# The ui/build folder should contain the built static files
+COPY ui/build/ ./ui/build/
+
+# Copy model folder (optional - create empty directory if models/ doesn't exist)
 # Place your model files in the models/ directory
-COPY models/ ./models/ 2>/dev/null || mkdir -p ./models
+COPY models/ ./models/
 
 # Copy startup script
 COPY start.sh .
