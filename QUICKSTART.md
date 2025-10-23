@@ -13,12 +13,17 @@ curl -L https://fly.io/install.sh | sh
 # Login
 fly auth login
 
-# Deploy (from backend directory)
-cd backend
+# Deploy from repository root (or cd backend if deploying from there)
+fly launch --copy-config --yes
+
+# Set your OpenRouter API key (get free credits at openrouter.ai)
+fly secrets set OPENROUTER_API_KEY=sk-or-v1-your-key-here
+
+# Deploy
 fly deploy
 ```
 
-✅ Your backend is live at `https://edumate-local.fly.dev` (or your app name)
+✅ Your backend is live at `https://your-app-name.fly.dev`
 
 ### 2️⃣ Deploy Frontend (3 minutes)
 
@@ -28,6 +33,8 @@ fly deploy
    - **Repository**: Your fork of this repo
    - **Branch**: `main`
    - **Main file path**: `ui/app_simple.py`
+   - **Advanced settings** → **Environment variables**:
+     - Add `EDUMATE_API_BASE` = `https://your-app-name.fly.dev` (if your Fly.io app name differs from "edumate-local")
 4. Click **"Deploy"**
 
 ✅ Your app is live at `https://your-app-name.streamlit.app`

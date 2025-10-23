@@ -26,14 +26,14 @@ def openrouter_complete(prompt: str, model: str | None = None) -> str:
             "OpenAI SDK not installed. Install with: pip install openai>=1.0.0"
         )
     
-    model = model or config.OPENAI_MODEL
+    model = model or config.OPENROUTER_MODEL
     
     print(f"[DEBUG] Using OpenRouter with model: {model}")
-    print(f"[DEBUG] Base URL: {config.OPENAI_BASE_URL}")
+    print(f"[DEBUG] Base URL: {config.OPENROUTER_BASE_URL}")
     
     client = OpenAI(
-        api_key=config.OPENAI_API_KEY,
-        base_url=config.OPENAI_BASE_URL,
+        api_key=config.OPENROUTER_API_KEY,
+        base_url=config.OPENROUTER_BASE_URL,
     )
     
     try:
@@ -67,14 +67,14 @@ async def openrouter_complete_stream(prompt: str, model: str | None = None) -> A
         yield "[Error: OpenAI SDK not installed. Install with: pip install openai>=1.0.0]"
         return
     
-    model = model or config.OPENAI_MODEL
+    model = model or config.OPENROUTER_MODEL
     
     print(f"[DEBUG] Streaming from OpenRouter with model: {model}")
-    print(f"[DEBUG] Base URL: {config.OPENAI_BASE_URL}")
+    print(f"[DEBUG] Base URL: {config.OPENROUTER_BASE_URL}")
     
     client = AsyncOpenAI(
-        api_key=config.OPENAI_API_KEY,
-        base_url=config.OPENAI_BASE_URL,
+        api_key=config.OPENROUTER_API_KEY,
+        base_url=config.OPENROUTER_BASE_URL,
     )
     
     try:

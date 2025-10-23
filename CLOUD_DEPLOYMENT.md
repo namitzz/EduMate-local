@@ -78,25 +78,18 @@ curl https://your-app-name.fly.dev/health
 
 ## Step 3: Deploy Frontend to Streamlit Cloud
 
-### 3.1 Update API URL (if needed)
+### 3.1 Deploy to Streamlit Cloud
 
-If your Fly.io app name is different from "edumate-local", update `ui/app_simple.py`:
-
-```python
-# Line 27
-DEFAULT_API_BASE = "https://your-app-name.fly.dev"
-```
-
-### 3.2 Deploy to Streamlit Cloud
-
-1. Push changes to GitHub
+1. Fork this repository to your GitHub account (if you haven't already)
 2. Go to [share.streamlit.io](https://share.streamlit.io)
 3. Click **"New app"**
 4. Configure:
    - **Repository**: `yourusername/EduMate-local`
    - **Branch**: `main`
    - **Main file path**: `ui/app_simple.py`
-5. Click **"Deploy"**
+5. **Advanced settings** → **Environment variables** (if your app name differs from "edumate-local"):
+   - Add: `EDUMATE_API_BASE` = `https://your-app-name.fly.dev`
+6. Click **"Deploy"**
 
 Wait 2-3 minutes for deployment to complete.
 
