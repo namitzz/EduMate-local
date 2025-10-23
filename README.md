@@ -23,7 +23,9 @@ An intelligent AI-powered Module Convenor Assistant that provides **personalized
    - Fork this repository to your GitHub account
    - Go to [share.streamlit.io](https://share.streamlit.io)
    - New app → select your forked repo → Main file: `ui/app_simple.py`
-   - Set environment variable: `EDUMATE_API_BASE` = `https://your-app-name.fly.dev`
+   - **Important:** If your Fly.io app name is different from "edumate-local":
+     - In Streamlit settings → "Advanced settings" → "Environment variables"
+     - Add: `EDUMATE_API_BASE` = `https://your-app-name.fly.dev`
    - Deploy!
 
 **Total cost:** $0/month base + minimal API usage (~$0.0015 per 1K tokens)
