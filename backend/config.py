@@ -62,10 +62,8 @@ MULTI_QUERY  = False    # re-enable later for recall
 # Get free credits at: https://openrouter.ai/
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 if not OPENROUTER_API_KEY:
-    raise ValueError(
-        "OPENROUTER_API_KEY environment variable is required. "
-        "Get your free API key at https://openrouter.ai/"
-    )
+    print("[WARNING] OPENROUTER_API_KEY not set. API calls will fail.")
+    print("[WARNING] Set it with: fly secrets set OPENROUTER_API_KEY=your-key-here")
 
 OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-3.5-turbo")

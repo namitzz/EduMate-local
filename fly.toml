@@ -1,8 +1,7 @@
 # fly.toml — EduMate Backend (FastAPI/Uvicorn)
 # Cloud-native deployment configuration for Fly.io
 # 
-# This is the main deployment configuration. You can also use
-# backend/fly.toml if you prefer to deploy from the backend directory.
+# Deploy from repository root with: fly deploy
 
 app = "edumate-local"            # Change if taken (also update Streamlit API base URL)
 primary_region = "lhr"           # London (pick nearest: lhr, iad, syd, etc.)
@@ -26,6 +25,7 @@ primary_region = "lhr"           # London (pick nearest: lhr, iad, syd, etc.)
 # Use Dockerfile in backend/
 [build]
   dockerfile = "backend/Dockerfile"
+  build-target = ""
 
 # HTTP service configuration (Fly.io v2)
 [http_service]
