@@ -1,0 +1,32 @@
+# Core FastAPI dependencies
+fastapi==0.114.0
+uvicorn[standard]==0.30.6
+gunicorn==21.2.0
+pydantic==2.8.2
+
+# Existing backend dependencies (from backend/requirements.txt)
+--extra-index-url https://download.pytorch.org/whl/cpu
+fastembed
+chromadb==0.5.5
+sentence-transformers==2.6.1
+torch==2.3.1+cpu
+python-multipart==0.0.9
+pypdf==4.2.0
+python-docx==1.1.2
+python-pptx==0.6.23
+beautifulsoup4==4.12.3
+lxml==5.2.1
+requests==2.32.3
+numpy>=1.24.0
+PyPDF2==3.0.1
+aiohttp==3.9.5
+openai>=1.0.0
+
+# Common model libraries (commented out - uncomment as needed)
+# transformers>=4.30.0
+# accelerate>=0.20.0
+# safetensors>=0.3.0
+# bitsandbytes>=0.40.0  # For quantization
+# scipy>=1.10.0
+# scikit-learn>=1.2.0
+# pandas>=2.0.0
