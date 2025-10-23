@@ -2,7 +2,35 @@
 
 An intelligent AI-powered Module Convenor Assistant that provides **personalized academic guidance, feedback, and mentorship** to students. More than just a Q&A bot, EduMate acts as a mini version of your module convenor, understanding course content deeply and offering tailored support.
 
-> 🚀 **[Cloud Deployment Guide](CLOUD_DEPLOYMENT.md)** | 📖 **[Quick Start](QUICKSTART.md)**
+## 🚀 Quick Deploy to Fly.io
+
+**Deploy in 3 simple steps:**
+
+1. **Get OpenRouter API key** at [openrouter.ai](https://openrouter.ai/) (free credits available)
+
+2. **Deploy Backend to Fly.io:**
+   ```bash
+   # Install Fly.io CLI: https://fly.io/docs/hands-on/install-flyctl/
+   fly auth login
+   
+   # Deploy from repository root
+   fly launch --copy-config --yes
+   fly secrets set OPENROUTER_API_KEY=your-key-here
+   fly deploy
+   ```
+
+3. **Deploy Frontend to Streamlit Cloud:**
+   - Fork this repository to your GitHub account
+   - Go to [share.streamlit.io](https://share.streamlit.io)
+   - New app → select your forked repo → Main file: `ui/app_simple.py`
+   - Set environment variable: `EDUMATE_API_BASE` = `https://your-app-name.fly.dev`
+   - Deploy!
+
+**Total cost:** $0/month base + minimal API usage (~$0.0015 per 1K tokens)
+
+> 📖 **Detailed instructions:** [Cloud Deployment Guide](CLOUD_DEPLOYMENT.md) | [Quick Start](QUICKSTART.md)
+
+---
 
 ## 🎯 What Makes EduMate Special?
 
@@ -30,40 +58,12 @@ EduMate automatically detects your intent and adapts its response style:
 ## Architecture
 
 - **UI**: Streamlit Cloud (free tier)
-- **Backend**: Fly.io (free tier)
+- **Backend**: Fly.io (free tier)  
 - **Vector DB**: ChromaDB (for document retrieval)
 - **Embeddings**: SentenceTransformers (`all-MiniLM-L6-v2`)
 - **LLM**: OpenRouter API (pay-as-you-go, ~$0.0015/1K tokens)
 - **Memory**: In-memory conversation tracking with pattern detection
 - **Persona**: Module Convenor prompt system with intent detection
-
-## 🚀 Deploy to Cloud (Zero Cost)
-
-**For production deployment with zero local setup:**
-
-Follow the comprehensive [Cloud Deployment Guide](CLOUD_DEPLOYMENT.md) to deploy EduMate using:
-- **Streamlit Cloud** (frontend) - Free tier
-- **Fly.io** (backend) - Free tier
-- **OpenRouter API** (LLM) - Pay-as-you-go
-
-Total base cost: **$0/month** + minimal API usage fees
-
-### Quick Deploy Steps
-
-1. **Get OpenRouter API key** at [openrouter.ai](https://openrouter.ai/) (free credits available)
-2. **Deploy Backend to Fly.io:**
-   ```bash
-   cd backend
-   fly launch --copy-config --yes
-   fly secrets set OPENROUTER_API_KEY=your-key-here
-   fly deploy
-   ```
-3. **Deploy Frontend to Streamlit Cloud:**
-   - Go to [share.streamlit.io](https://share.streamlit.io)
-   - New app → select repo → Main file: `ui/app_simple.py`
-   - Deploy!
-
-See full details in [CLOUD_DEPLOYMENT.md](CLOUD_DEPLOYMENT.md)
 
 ## Quick Start (Local Development)
 
@@ -244,14 +244,41 @@ Modify the Module Convenor persona in `backend/persona.py` to customize:
 
 ## 🆘 Troubleshooting
 
-See [CLOUD_DEPLOYMENT.md](CLOUD_DEPLOYMENT.md#-monitoring--troubleshooting) for comprehensive troubleshooting guide.
+### Quick Fixes
 
-**Common Issues:**
+1. **Backend won't start / health check fails**
+   ```bash
+   fly status              # Check if machines are running
+   fly logs --app your-app-name    # View recent logs
+   fly secrets list        # Verify OPENROUTER_API_KEY is set
+   ```
 
-1. **Backend offline**: Check `fly status` and `fly logs`
-2. **API key errors**: Verify `fly secrets list` shows OPENROUTER_API_KEY
-3. **High costs**: Switch to free model or set spending limits
-4. **Slow responses**: Check Fly.io machine is running, may need to warm up
+2. **"OPENROUTER_API_KEY not set" warning**
+   ```bash
+   fly secrets set OPENROUTER_API_KEY=your-key-here
+   fly deploy              # Redeploy after setting secret
+   ```
+
+3. **Port binding errors**
+   - The app uses PORT env var from Fly.io (default 8080)
+   - Health check endpoint: `/health` 
+   - Verify fly.toml has `internal_port = 8080`
+
+4. **Streamlit can't connect to backend**
+   - Verify backend URL in Streamlit: `https://your-app-name.fly.dev`
+   - Check CORS is enabled (backend/main.py already has this)
+   - Test backend health: `curl https://your-app-name.fly.dev/health`
+
+5. **High costs / unexpected charges**
+   ```bash
+   # Set spending limit
+   fly orgs billing-limits set --max-monthly-spend 5
+   
+   # Use free models
+   fly secrets set OPENROUTER_MODEL=meta-llama/llama-3.1-8b-instruct:free
+   ```
+
+For more help, see [CLOUD_DEPLOYMENT.md](CLOUD_DEPLOYMENT.md) or check [Fly.io docs](https://fly.io/docs/).
 
 ## 🤝 Contributing
 
