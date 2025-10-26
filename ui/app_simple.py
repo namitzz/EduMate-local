@@ -31,7 +31,7 @@ from urllib.parse import urljoin
 # Allow env or query param override; fallback to production
 DEFAULT_API_BASE = "https://edumate-local.fly.dev"
 api_from_env = os.getenv("EDUMATE_API_BASE")
-api_from_query = st.query_params.get("api", [None])[0] if hasattr(st, "query_params") else None
+api_from_query = st.query_params.get("api") if hasattr(st, "query_params") else None
 
 API_BASE_URL = (api_from_query or api_from_env or DEFAULT_API_BASE).rstrip("/")
 

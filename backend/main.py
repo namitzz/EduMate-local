@@ -339,7 +339,10 @@ async def chat_stream(req: ChatStreamRequest):
         full_response = ""
         async with generation_semaphore:
             try:
-                async for token in ollama_complete_stream(prompt):
+                # Convert prompt string to message format expected by OpenRouter API
+                messages = [{"role": "user", "content": prompt}]
+                # ollama_complete_stream is a sync generator, use regular for loop
+                for token in ollama_complete_stream(messages):
                     full_response += token
                     yield token
                 
@@ -426,7 +429,9 @@ def chat(req: ChatRequest):
     answer = ""
     error_type = None
     try:
-        answer = ollama_complete(prompt)
+        # Convert prompt string to message format expected by OpenRouter API
+        messages = [{"role": "user", "content": prompt}]
+        answer = ollama_complete(messages)
         print(f"[DEBUG] Ollama response length: {len(answer)} chars")
     except RuntimeError as e:
         error_str = str(e)
