@@ -249,6 +249,26 @@ fly secrets set OPENROUTER_API_KEY=sk-or-v1-your-api-key-here
 fly secrets list
 ```
 
+#### "fly.toml is not valid: check item name not a string" error
+This error occurs when the `[[checks]]` section is missing the required `name` field.
+
+**Solution:**
+1. Open your `fly.toml` file
+2. Add `name = "health"` to the `[[checks]]` section:
+   ```toml
+   [[checks]]
+     name = "health"
+     type = "http"
+     port = 8080
+     method = "get"
+     path = "/health"
+   ```
+3. Validate the TOML syntax:
+   ```bash
+   python3 -c "import tomllib; tomllib.load(open('fly.toml', 'rb'))"
+   ```
+4. Deploy again: `fly deploy`
+
 #### High API costs
 1. Check usage: Monitor OpenRouter dashboard
 2. Switch to free model (see "Use Free Models" above)
