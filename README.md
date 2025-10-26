@@ -266,12 +266,17 @@ Modify the Module Convenor persona in `backend/persona.py` to customize:
    - Health check endpoint: `/health` 
    - Verify fly.toml has `internal_port = 8080`
 
-4. **Streamlit can't connect to backend**
+4. **"fly.toml is not valid: check item name not a string" error**
+   - Ensure all `[[checks]]` sections have a `name` field
+   - Example: `name = "health"` should be added to the checks section
+   - Validate TOML syntax: `python3 -c "import tomllib; tomllib.load(open('fly.toml', 'rb'))"`
+
+5. **Streamlit can't connect to backend**
    - Verify backend URL in Streamlit: `https://your-app-name.fly.dev`
    - Check CORS is enabled (backend/main.py already has this)
    - Test backend health: `curl https://your-app-name.fly.dev/health`
 
-5. **High costs / unexpected charges**
+6. **High costs / unexpected charges**
    ```bash
    # Set spending limit
    fly orgs billing-limits set --max-monthly-spend 5
