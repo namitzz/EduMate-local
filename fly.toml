@@ -43,6 +43,7 @@ primary_region = "lhr"           # London (pick nearest: lhr, iad, syd, etc.)
 
 # Health check endpoint
 [[checks]]
+  name = "health"
   type = "http"
   port = 8080
   method = "get"
