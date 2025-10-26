@@ -25,7 +25,6 @@ primary_region = "lhr"           # London (pick nearest: lhr, iad, syd, etc.)
 # Use Dockerfile in backend/
 [build]
   dockerfile = "backend/Dockerfile"
-  build-target = ""
 
 # HTTP service configuration (Fly.io v2)
 [http_service]

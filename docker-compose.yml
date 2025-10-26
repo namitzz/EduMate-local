@@ -2,7 +2,7 @@ services:
   edumate:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.local
     ports:
       - "8000:8000"
     volumes:
