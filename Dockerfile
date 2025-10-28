@@ -18,5 +18,5 @@ RUN pip install -r requirements.txt
 COPY . .
 
 # Default port: 8080 (ensure fly.toml internal_port matches)
-# Replace main:app below if your module/variable are different (e.g. app:app)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Run the FastAPI app from the app module
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
