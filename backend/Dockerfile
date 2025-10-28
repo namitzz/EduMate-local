@@ -1,19 +1,22 @@
 FROM python:3.11-slim
+
 WORKDIR /app
 
-ENV PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_ROOT_USER_ACTION=ignore
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# Install curl for health checks
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Optional system deps for building wheels
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential gcc \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt .
+
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
+
 COPY . .
 
-# Fly.io sets PORT env var, default to 8000 for local development
-ENV PORT=8000
-EXPOSE ${PORT}
-
-CMD uvicorn main:app --host 0.0.0.0 --port ${PORT}
+# Use correct module path: app.main:app (the FastAPI app is in app/main.py)
+# Ensure this port matches fly.toml internal_port (8080)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
