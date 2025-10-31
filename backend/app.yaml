@@ -8,4 +8,5 @@ handlers:
   - url: /.*
     script: auto
 env_variables:
+  # TODO: Update to your actual Streamlit app URL after deployment
   FRONTEND_ORIGIN: "https://your-streamlit-app.streamlit.app"

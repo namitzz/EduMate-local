@@ -11,7 +11,7 @@ This is a production-safe implementation for App Engine (Option 1):
 """
 import os
 import json
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -25,6 +25,9 @@ from google.cloud import secretmanager
 # --- Configuration ---
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")  # Automatically set by App Engine
 OPENROUTER_API_KEY = None  # Will be loaded from Secret Manager at startup
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+DEFAULT_FRONTEND_URL = "https://edumate.streamlit.app"
+API_TIMEOUT_SECONDS = int(os.getenv("API_TIMEOUT", "60"))  # Configurable timeout
 
 
 # --- Secret Manager Integration ---
@@ -113,7 +116,7 @@ class ChatRequest(BaseModel):
     Chat request payload matching OpenRouter API format.
     """
     model: str = "openrouter/anthropic/claude-3.5-sonnet"
-    messages: List[Dict[str, str]]
+    messages: List[Dict[str, Any]]  # Support complex message formats (function calls, etc.)
     temperature: float = 0.2
 
 
@@ -161,12 +164,12 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=400, detail="No messages provided")
     
     # OpenRouter API endpoint (OpenAI-compatible)
-    url = "https://openrouter.ai/api/v1/chat/completions"
+    url = OPENROUTER_API_URL
     
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": os.getenv("FRONTEND_ORIGIN", "https://edumate.streamlit.app"),
+        "HTTP-Referer": os.getenv("FRONTEND_ORIGIN", DEFAULT_FRONTEND_URL),
         "X-Title": "EduMate",
     }
     
@@ -185,8 +188,8 @@ async def chat(request: ChatRequest):
         Never logs user message content for privacy.
         """
         try:
-            # Use httpx.AsyncClient with timeout for streaming
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            # Use httpx.AsyncClient with configurable timeout for streaming
+            async with httpx.AsyncClient(timeout=API_TIMEOUT_SECONDS) as client:
                 async with client.stream(
                     "POST",
                     url,
