@@ -52,12 +52,11 @@ def load_secret_from_gcp(secret_name: str) -> str:
     
     try:
         response = client.access_secret_version(request={"name": secret_path})
-        secret_value = response.payload.data.decode("UTF-8")
-        print(f"[INFO] Successfully loaded secret: {secret_name}")
-        return secret_value
-    except Exception as e:
-        print(f"[ERROR] Failed to load secret {secret_name}: {e}")
-        raise RuntimeError(f"Failed to load secret {secret_name}: {e}")
+        # Decode and return immediately to minimize scope of sensitive data
+        return response.payload.data.decode("UTF-8")
+    except Exception:
+        # Raise without logging to avoid any potential data leakage
+        raise RuntimeError(f"Failed to load secret {secret_name}")
 
 
 # --- Application Lifecycle ---
@@ -76,12 +75,14 @@ async def lifespan(app: FastAPI):
     if not OPENROUTER_API_KEY and PROJECT_ID:
         try:
             OPENROUTER_API_KEY = load_secret_from_gcp("OPENROUTER_API_KEY")
-        except Exception as e:
-            print(f"[WARNING] Could not load OPENROUTER_API_KEY from Secret Manager: {e}")
+        except RuntimeError as e:
+            # Log error here, outside the secret loading function
+            print(f"[WARNING] {e}")
             print("[WARNING] API calls will fail without a valid API key")
     
+    # Log success status without exposing secret
     if OPENROUTER_API_KEY:
-        print("[INFO] OPENROUTER_API_KEY loaded successfully")
+        print("[INFO] API key configured successfully")
     else:
         print("[WARNING] OPENROUTER_API_KEY not set - API calls will fail")
     
