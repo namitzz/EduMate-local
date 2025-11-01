@@ -32,6 +32,81 @@ An intelligent AI-powered Module Convenor Assistant that provides **personalized
 
 > 📖 **Detailed instructions:** [Cloud Deployment Guide](CLOUD_DEPLOYMENT.md) | [Quick Start](QUICKSTART.md)
 
+## 🚀 Deploying EduMate backend to Google App Engine (Option 1)
+
+**Alternative deployment using Google App Engine Standard with hosted LLM API.**
+
+This option provides a minimal-cost backend deployment using Google Cloud Platform's App Engine with automatic scaling and zero-cost idle time.
+
+### One-Time Setup
+
+1. **Enable required Google Cloud services:**
+   ```bash
+   gcloud services enable appengine.googleapis.com secretmanager.googleapis.com
+   ```
+
+2. **Create App Engine application:**
+   ```bash
+   # Choose a region close to your users (e.g., europe-west for Europe)
+   gcloud app create --region=europe-west
+   ```
+
+3. **Store your OpenRouter API key in Secret Manager:**
+   ```bash
+   # Replace sk-REPLACE with your actual OpenRouter API key
+   echo -n "sk-REPLACE" | gcloud secrets create OPENROUTER_API_KEY --data-file=-
+   ```
+
+4. **Grant App Engine access to the secret:**
+   ```bash
+   PROJECT_ID=$(gcloud config get-value project)
+   gcloud secrets add-iam-policy-binding OPENROUTER_API_KEY \
+     --member="serviceAccount:${PROJECT_ID}@appspot.gserviceaccount.com" \
+     --role="roles/secretmanager.secretAccessor"
+   ```
+
+### Deploy Backend
+
+```bash
+cd backend
+gcloud app deploy
+gcloud app browse
+```
+
+Your backend will be available at: `https://<PROJECT_ID>.ew.r.appspot.com`
+
+### Configure UI
+
+Set the `EDUMATE_API_BASE` environment variable to your App Engine URL:
+```bash
+export EDUMATE_API_BASE=https://<PROJECT_ID>.ew.r.appspot.com
+```
+
+Or configure it in Streamlit Cloud's "Advanced settings" → "Environment variables".
+
+### Important Notes
+
+- **Cost Optimization**: Keep `min_instances: 0` in `app.yaml` to minimize costs. App Engine will automatically scale down to zero when idle.
+- **CORS Configuration**: The default configuration allows all origins. In production, restrict CORS to your Streamlit origin by updating the `FRONTEND_ORIGIN` environment variable in `app.yaml`.
+- **Rate Limiting**: Consider implementing rate limiting for production use (TODO in code).
+- **API Compatibility**: This minimal backend provides `/health` and `/chat` endpoints with streaming support. It's optimized for LLM proxy functionality without RAG/retrieval features.
+
+### Testing the Deployment
+
+```bash
+# Test health endpoint
+curl https://<PROJECT_ID>.ew.r.appspot.com/health
+
+# Test chat endpoint (requires valid API key in Secret Manager)
+curl -X POST https://<PROJECT_ID>.ew.r.appspot.com/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openrouter/anthropic/claude-3.5-sonnet",
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "temperature": 0.2
+  }'
+```
+
 ---
 
 ## 🎯 What Makes EduMate Special?

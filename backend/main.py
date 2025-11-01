@@ -1,470 +1,253 @@
-from typing import List, Dict, Optional
-import re
-import asyncio
-from enum import Enum
-from fastapi import FastAPI, HTTPException, Header
+"""
+Minimal FastAPI app for Google App Engine Standard deployment.
+Streams LLM responses from OpenRouter API using Google Secret Manager for credentials.
+
+This is a production-safe implementation for App Engine (Option 1):
+- GET /health: Health check endpoint
+- POST /chat: Streaming chat completions from OpenRouter API
+- Loads API key from Google Secret Manager (no secrets in code)
+- Implements timeout and error handling
+- Permissive CORS (TODO: restrict to FRONTEND_ORIGIN in production)
+"""
+import os
+import json
+from typing import List, Dict, Optional, Any
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-
-from models import ollama_complete, ollama_complete_stream
-from retrieval import Retriever
-from memory import get_memory
-from persona import compose_convenor_prompt, InteractionIntent, ModuleConvenorPersona
-import config
+import httpx
+from google.cloud import secretmanager
 
 
-# --- Error Classification ---
-class ErrorType(Enum):
-    """Classification of different error types for better user feedback"""
-    NO_CONTEXT = "no_context"
-    RETRIEVAL_ERROR = "retrieval_error"
-    MODEL_CONNECTION = "model_connection"
-    MODEL_TIMEOUT = "model_timeout"
-    MODEL_EMPTY_RESPONSE = "model_empty_response"
-    MODEL_ERROR = "model_error"
-    UNKNOWN = "unknown"
+# --- Configuration ---
+PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")  # Automatically set by App Engine
+OPENROUTER_API_KEY = None  # Will be loaded from Secret Manager at startup
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+DEFAULT_FRONTEND_URL = "https://edumate.streamlit.app"
+API_TIMEOUT_SECONDS = int(os.getenv("API_TIMEOUT", "60"))  # Configurable timeout
 
 
-def get_error_message(error_type: ErrorType, sources: List[str] = None, error_details: str = None) -> str:
+# --- Secret Manager Integration ---
+def load_secret_from_gcp(secret_name: str) -> str:
     """
-    Generate user-friendly, actionable error messages based on error type.
+    Load a secret from Google Cloud Secret Manager.
     
     Args:
-        error_type: The type of error that occurred
-        sources: Optional list of sources that were found (for context-found-but-generation-failed cases)
-        error_details: Optional technical details for logging
+        secret_name: Name of the secret (e.g., 'OPENROUTER_API_KEY')
     
     Returns:
-        A user-friendly error message with actionable guidance
+        The secret value as a string
+    
+    Raises:
+        RuntimeError: If secret cannot be loaded
     """
-    if error_details:
-        print(f"[ERROR DETAILS] {error_type.value}: {error_details}")
+    if not PROJECT_ID:
+        raise RuntimeError("GOOGLE_CLOUD_PROJECT environment variable not set")
     
-    if error_type == ErrorType.NO_CONTEXT:
-        return (
-            "I couldn't find relevant information in the course materials for your question.\n\n"
-            "**Suggestions:**\n"
-            "• Try rephrasing your question with different keywords\n"
-            "• Ask about topics that are covered in the uploaded documents\n"
-            "• Check if documents have been ingested (run `python ingest.py`)\n"
-            "• Make your question more specific to the course content"
-        )
+    client = secretmanager.SecretManagerServiceClient()
+    secret_path = f"projects/{PROJECT_ID}/secrets/{secret_name}/versions/latest"
     
-    elif error_type == ErrorType.RETRIEVAL_ERROR:
-        return (
-            "There was an error searching through the course materials.\n\n"
-            "**Possible causes:**\n"
-            "• The vector database may not be initialized\n"
-            "• Documents may not have been ingested yet\n\n"
-            "**What to do:**\n"
-            "• Run `python ingest.py` in the backend directory\n"
-            "• Check that documents exist in the corpus/ folder\n"
-            "• Restart the backend server if the issue persists"
-        )
-    
-    elif error_type == ErrorType.MODEL_CONNECTION:
-        # Extract URL from error_details if available
-        url_info = ""
-        if error_details and "URL:" in error_details:
-            try:
-                url_part = error_details.split("URL:")[1].split(")")[0].strip()
-                url_info = f"\n\n**Connection attempted to:** {url_part}"
-            except:
-                pass
-        
-        return (
-            "Unable to connect to the AI model (OpenRouter API).\n\n"
-            "**Possible causes:**\n"
-            "• OpenRouter service is temporarily unavailable\n"
-            "• Network connectivity issues\n"
-            "• Invalid API key or authentication failure\n\n"
-            "**What to do:**\n"
-            "• Check your internet connection\n"
-            "• Verify OPENROUTER_API_KEY is set correctly\n"
-            "• Check OpenRouter status at https://openrouter.ai/status\n"
-            "• Try again in a moment\n"
-            "• Contact support if the issue persists"
-            f"{url_info}"
-        )
-    
-    elif error_type == ErrorType.MODEL_TIMEOUT:
-        return (
-            "The AI model took too long to respond (timeout).\n\n"
-            "**Possible causes:**\n"
-            "• The model is overloaded or slow\n"
-            "• Your question may be too complex\n"
-            "• The model might be loading for the first time\n\n"
-            "**What to do:**\n"
-            "• Try asking a simpler question\n"
-            "• Wait a moment and try again (the model may be warming up)\n"
-            "• Consider using a faster model like `qwen2.5:1.5b-instruct`"
-        )
-    
-    elif error_type == ErrorType.MODEL_EMPTY_RESPONSE:
-        if sources:
-            return (
-                "The AI model returned an empty response.\n\n"
-                "I found relevant information in the course materials, but the model "
-                "failed to generate an answer. This could be a temporary issue.\n\n"
-                "**What to do:**\n"
-                "• Try rephrasing your question\n"
-                "• Check the sources below for relevant information\n"
-                "• Try again in a moment\n"
-                "• If this persists, restart the backend server"
-            )
-        else:
-            return (
-                "The AI model returned an empty response.\n\n"
-                "**What to do:**\n"
-                "• Try asking your question again\n"
-                "• Rephrase your question more clearly\n"
-                "• Wait a moment and try again\n"
-                "• Restart the backend server if the issue persists"
-            )
-    
-    elif error_type == ErrorType.MODEL_ERROR:
-        return (
-            "An error occurred while generating the answer.\n\n"
-            "**What to do:**\n"
-            "• Try asking your question again\n"
-            "• Simplify your question if it's complex\n"
-            "• Check backend logs for technical details\n"
-            "• Restart the backend server if issues persist"
-        )
-    
-    else:  # UNKNOWN
-        return (
-            "An unexpected error occurred.\n\n"
-            "**What to do:**\n"
-            "• Try your question again\n"
-            "• Check backend logs for details\n"
-            "• Restart the backend server\n"
-            "• Report this issue if it continues"
-        )
+    try:
+        response = client.access_secret_version(request={"name": secret_path})
+        # Decode and return immediately to minimize scope of sensitive data
+        return response.payload.data.decode("UTF-8")
+    except Exception:
+        # Raise without logging to avoid any potential data leakage
+        raise RuntimeError(f"Failed to load secret {secret_name}")
 
-# --- FastAPI app ---
-app = FastAPI(title="EduMate Local API", version="0.1.0")
+
+# --- Application Lifecycle ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application startup and shutdown lifecycle handler.
+    Loads secrets from Secret Manager at startup.
+    """
+    global OPENROUTER_API_KEY
+    
+    # Try to load from environment first (for local testing)
+    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+    
+    # If not in environment, load from Secret Manager (production on App Engine)
+    if not OPENROUTER_API_KEY and PROJECT_ID:
+        try:
+            OPENROUTER_API_KEY = load_secret_from_gcp("OPENROUTER_API_KEY")
+        except RuntimeError as e:
+            # Log error here, outside the secret loading function
+            print(f"[WARNING] {e}")
+            print("[WARNING] API calls will fail without a valid API key")
+    
+    # Log success status without exposing secret
+    if OPENROUTER_API_KEY:
+        print("[INFO] API key configured successfully")
+    else:
+        print("[WARNING] OPENROUTER_API_KEY not set - API calls will fail")
+    
+    yield
+    
+    # Cleanup (if needed)
+    print("[INFO] Shutting down...")
+
+
+# --- FastAPI App ---
+app = FastAPI(
+    title="EduMate App Engine API",
+    version="0.1.0",
+    description="Minimal LLM proxy for App Engine Standard deployment",
+    lifespan=lifespan
+)
+
+# TODO: Restrict CORS to FRONTEND_ORIGIN only in production
+# For now, allow all origins for easier initial setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # TODO: Change to [os.getenv("FRONTEND_ORIGIN")] in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Shared retriever (Chroma is already persisted)
-retriever = Retriever()
 
-# Semaphore for concurrency control
-generation_semaphore = asyncio.Semaphore(config.MAX_ACTIVE_GENERATIONS)
-
-
-# --- Schemas ---
+# --- Request/Response Models ---
 class ChatRequest(BaseModel):
-    messages: List[Dict]
-    session_id: Optional[str] = None  # For conversation memory
-
-
-class ChatStreamRequest(BaseModel):
-    messages: List[Dict]
-    mode: Optional[str] = "docs"  # docs, coach, or facts
-    session_id: Optional[str] = None  # For conversation memory
-
-
-# --- Greeting detection ---
-def is_greeting_or_chitchat(msg: str) -> bool:
     """
-    Detect if the message is a greeting or simple chitchat that doesn't require
-    retrieval from course materials.
+    Chat request payload matching OpenRouter API format.
     """
-    msg_lower = msg.strip().lower()
-    
-    # Expanded greeting patterns to catch more variations
-    # Support longer greetings (up to 30 chars)
-    if len(msg_lower) <= 30:
-        # Comprehensive greeting patterns
-        greeting_patterns = [
-            r'^(hi|hello|hey|hii|hiii|heya|heyy|heyyy|howdy|greetings|sup|yo|hola|aloha|salut)([!.?,\s]*)?$',
-            r'^(hi|hello|hey)\s+(there|everyone|all)([!.?,\s]*)?$',
-            r'^(good\s+(morning|afternoon|evening|day|night))([!.?,\s]*)?$',
-            r'^(what\'?s?\s+up|wassup|whats\s+up|whatsup)([!.?,\s]*)?$',
-            r'^(how\s+(are|r)\s+(you|u|ya))([!.?,\s]*)?$',
-            r'^(how\'?s?\s+it\s+going)([!.?,\s]*)?$',
-            r'^(nice\s+to\s+meet\s+you)([!.?,\s]*)?$',
-            r'^(thanks|thank\s+you|thx|ty)([!.?,\s]*)?$',
-            r'^(bye|goodbye|see\s+ya|cya|later)([!.?,\s]*)?$',
-        ]
-        
-        for pattern in greeting_patterns:
-            if re.match(pattern, msg_lower):
-                return True
-    
-    return False
+    model: str = "openrouter/anthropic/claude-3.5-sonnet"
+    messages: List[Dict[str, Any]]  # Support complex message formats (function calls, etc.)
+    temperature: float = 0.2
 
 
-# --- Prompt builder ---
-def compose_prompt(contexts: List[Dict], user_msg: str, session_id: Optional[str] = None):
-    """
-    Build a grounded prompt from retrieved contexts with inline citation markers.
-    Enhanced with Module Convenor persona for intelligent academic guidance.
-    Returns (prompt_str, sources_list, intent).
-    """
-    # Get conversation context if session_id provided
-    conversation_context = None
-    if session_id:
-        memory = get_memory()
-        conversation_context = memory.get_recent_context(session_id, num_messages=4)
-    
-    # Use enhanced Module Convenor prompting
-    prompt, sources, intent = compose_convenor_prompt(
-        contexts=contexts,
-        user_msg=user_msg,
-        conversation_context=conversation_context,
-        fast_mode=config.FAST_MODE
-    )
-    
-    return prompt, sources, intent
-
-
-# --- Health route ---
+# --- Health Check ---
 @app.get("/health")
 def health():
+    """
+    Health check endpoint for App Engine load balancer.
+    
+    Returns:
+        dict: Status indicator
+    """
     return {"ok": True}
 
 
-# --- Memory management routes ---
-@app.get("/memory/{session_id}")
-def get_session_memory(session_id: str):
-    """Get conversation history for a session."""
-    memory = get_memory()
-    conversation = memory.get_conversation(session_id)
-    patterns = memory.detect_patterns(session_id)
-    return {
-        "session_id": session_id,
-        "conversation": conversation,
-        "patterns": patterns
-    }
-
-
-@app.delete("/memory/{session_id}")
-def clear_session_memory(session_id: str):
-    """Clear conversation history for a session."""
-    memory = get_memory()
-    memory.clear_session(session_id)
-    return {"status": "cleared", "session_id": session_id}
-
-
-# --- Streaming Chat route (new, additive) ---
-@app.post("/chat_stream")
-async def chat_stream(req: ChatStreamRequest):
-    """
-    Streaming endpoint for Fast Mode and public UI.
-    Supports modes: docs (RAG), coach (study tips), facts (quick answers).
-    """
-    # Find the last user message
-    last_user: Optional[str] = ""
-    for m in reversed(req.messages):
-        if (m.get("role") or "").lower() == "user":
-            last_user = m.get("content", "")
-            break
-    if not last_user:
-        raise HTTPException(status_code=400, detail="No user message provided")
-
-    # Check if it's a greeting
-    if is_greeting_or_chitchat(last_user):
-        async def greeting_gen():
-            greeting = (
-                "Hello! I'm your AI Module Convenor Assistant. "
-                "I'm here to provide personalized academic guidance and support for your studies. "
-                "I can help you with:\n"
-                "• Understanding course concepts and theories\n"
-                "• Assignment guidance and feedback\n"
-                "• Exam preparation strategies\n"
-                "• Study planning and learning techniques\n\n"
-                "What would you like to work on today?"
-            )
-            yield greeting
-        return StreamingResponse(greeting_gen(), media_type="text/plain")
-
-    # Build prompt based on mode
-    prompt = ""
-    mode = (req.mode or "docs").lower()
-    
-    if mode == "coach":
-        # Study coaching mode - no retrieval, general study advice
-        prompt = (
-            "You are EduMate, a study coach. Provide helpful, encouraging study advice. "
-            "Be concise and practical.\n\n"
-            f"Question: {last_user}\n\nAnswer:"
-        )
-    elif mode == "facts":
-        # Quick facts mode - no retrieval, concise answers
-        prompt = (
-            "You are EduMate. Provide a brief, factual answer.\n\n"
-            f"Question: {last_user}\n\nAnswer:"
-        )
-    else:
-        # Default: docs mode with retrieval (RAG)
-        ctx = []
-        retrieval_error = None
-        try:
-            ctx = retriever.retrieve(last_user, model_call=ollama_complete)
-        except Exception as e:
-            retrieval_error = e
-            print(f"[ERROR] Retrieval error: {repr(e)}")
-
-        # Handle retrieval failure
-        if retrieval_error:
-            async def retrieval_error_gen():
-                yield get_error_message(ErrorType.RETRIEVAL_ERROR, error_details=str(retrieval_error))
-            return StreamingResponse(retrieval_error_gen(), media_type="text/plain")
-
-        # Handle no context found
-        if not ctx:
-            async def no_context_gen():
-                yield get_error_message(ErrorType.NO_CONTEXT)
-            return StreamingResponse(no_context_gen(), media_type="text/plain")
-
-        # Build prompt with enhanced Module Convenor context
-        prompt, sources, intent = compose_prompt(ctx, last_user, session_id=req.session_id)
-        
-        # Save user message to memory if session_id provided
-        if req.session_id:
-            memory = get_memory()
-            memory.add_message(req.session_id, "user", last_user, metadata={"intent": intent.value})
-
-    # Stream generation with semaphore and improved error handling
-    async def generate_stream():
-        full_response = ""
-        async with generation_semaphore:
-            try:
-                # Convert prompt string to message format expected by OpenRouter API
-                messages = [{"role": "user", "content": prompt}]
-                # ollama_complete_stream is a sync generator, use regular for loop
-                for token in ollama_complete_stream(messages):
-                    full_response += token
-                    yield token
-                
-                # Save assistant response to memory if session_id provided
-                if req.session_id and mode == "docs":
-                    memory = get_memory()
-                    memory.add_message(req.session_id, "assistant", full_response, metadata={"sources": sources})
-                    
-            except Exception as e:
-                error_str = str(e)
-                print(f"[ERROR] Stream generation failed: {repr(e)}")
-                
-                # Classify the error
-                if "timeout" in error_str.lower():
-                    error_type = ErrorType.MODEL_TIMEOUT
-                elif "connection" in error_str.lower():
-                    error_type = ErrorType.MODEL_CONNECTION
-                else:
-                    error_type = ErrorType.MODEL_ERROR
-                
-                yield f"\n\n{get_error_message(error_type, error_details=error_str)}"
-
-    return StreamingResponse(generate_stream(), media_type="text/plain")
-
-
-# --- Chat route ---
+# --- Chat Endpoint with Streaming ---
 @app.post("/chat")
-def chat(req: ChatRequest):
-    # find the last user message
-    last_user: Optional[str] = ""
-    for m in reversed(req.messages):
-        if (m.get("role") or "").lower() == "user":
-            last_user = m.get("content", "")
-            break
-    if not last_user:
-        raise HTTPException(status_code=400, detail="No user message provided")
-
-    # Check if it's a greeting or chitchat
-    if is_greeting_or_chitchat(last_user):
-        greeting_response = (
-            "Hello! I'm your AI Module Convenor Assistant. "
-            "I'm here to provide personalized academic guidance and support for your studies. "
-            "I can help you with understanding concepts, assignment guidance, exam preparation, and study planning. "
-            "What would you like to work on today?"
-        )
-        return {"answer": greeting_response, "sources": []}
-
-    # retrieve context with improved error handling
-    ctx = []
-    retrieval_error = None
-    try:
-        ctx = retriever.retrieve(last_user, model_call=ollama_complete)
-    except Exception as e:
-        retrieval_error = e
-        print(f"[ERROR] Retrieval error: {repr(e)}")
-
-    # Handle retrieval failure
-    if retrieval_error:
-        error_msg = get_error_message(ErrorType.RETRIEVAL_ERROR, error_details=str(retrieval_error))
-        return {"answer": error_msg, "sources": []}
-
-    # Handle no context found
-    if not ctx:
-        error_msg = get_error_message(ErrorType.NO_CONTEXT)
-        return {"answer": error_msg, "sources": []}
-
-    # build prompt with Module Convenor persona
-    prompt, sources, intent = compose_prompt(ctx, last_user, session_id=req.session_id)
+async def chat(request: ChatRequest):
+    """
+    Stream chat completions from OpenRouter API.
     
-    # Save user message to memory if session_id provided
-    if req.session_id:
-        memory = get_memory()
-        memory.add_message(req.session_id, "user", last_user, metadata={"intent": intent.value})
-
-    # debug logs
-    try:
-        print("\n[DEBUG] Retrieved context preview:",
-              [c["doc"][:120].replace("\n", " ") for c in ctx][:3])
-        print("[DEBUG] Prompt head:", prompt[:300].replace("\n", " "))
-    except Exception:
-        pass
-
-    # call Ollama with improved error handling
-    answer = ""
-    error_type = None
-    try:
-        # Convert prompt string to message format expected by OpenRouter API
-        messages = [{"role": "user", "content": prompt}]
-        answer = ollama_complete(messages)
-        print(f"[DEBUG] Ollama response length: {len(answer)} chars")
-    except RuntimeError as e:
-        error_str = str(e)
-        print(f"[ERROR] Ollama call error: {repr(e)}")
+    Accepts OpenAI-compatible chat format and streams tokens via Server-Sent Events (SSE).
+    Uses httpx.AsyncClient for streaming with proper timeout handling.
+    
+    Args:
+        request: ChatRequest with model, messages, and temperature
+    
+    Returns:
+        StreamingResponse: Server-Sent Events stream of chat tokens
+    
+    Raises:
+        HTTPException: If API key is not configured or request is invalid
+    
+    Note:
+        Never logs sensitive user content. Only logs error types for debugging.
+    """
+    if not OPENROUTER_API_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="OPENROUTER_API_KEY not configured. Please set up Secret Manager."
+        )
+    
+    # Validate request
+    if not request.messages:
+        raise HTTPException(status_code=400, detail="No messages provided")
+    
+    # OpenRouter API endpoint (OpenAI-compatible)
+    url = OPENROUTER_API_URL
+    
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": os.getenv("FRONTEND_ORIGIN", DEFAULT_FRONTEND_URL),
+        "X-Title": "EduMate",
+    }
+    
+    payload = {
+        "model": request.model,
+        "messages": request.messages,
+        "temperature": request.temperature,
+        "stream": True,  # Enable streaming
+    }
+    
+    # Stream response from OpenRouter
+    async def stream_tokens():
+        """
+        Stream tokens from OpenRouter API as Server-Sent Events.
+        Implements proper error handling and timeout management.
+        Never logs user message content for privacy.
+        """
+        try:
+            # Use httpx.AsyncClient with configurable timeout for streaming
+            async with httpx.AsyncClient(timeout=API_TIMEOUT_SECONDS) as client:
+                async with client.stream(
+                    "POST",
+                    url,
+                    headers=headers,
+                    json=payload,
+                ) as response:
+                    # Handle API errors
+                    if response.status_code != 200:
+                        # Don't log potentially sensitive error details
+                        print(f"[ERROR] OpenRouter API error: status={response.status_code}")
+                        yield f"data: {json.dumps({'error': 'API request failed'})}\n\n"
+                        return
+                    
+                    # Process SSE stream from OpenRouter
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
+                        
+                        if line.startswith("data: "):
+                            data_str = line[6:]  # Remove "data: " prefix
+                            
+                            # Check for stream completion
+                            if data_str.strip() == "[DONE]":
+                                yield "data: [DONE]\n\n"
+                                break
+                            
+                            try:
+                                # Parse and forward SSE chunk to client
+                                data = json.loads(data_str)
+                                yield f"data: {json.dumps(data)}\n\n"
+                            except json.JSONDecodeError:
+                                # Ignore malformed JSON chunks (common in SSE streams)
+                                continue
         
-        # Classify the error based on the exception message
-        if "Empty response" in error_str:
-            error_type = ErrorType.MODEL_EMPTY_RESPONSE
-        elif "ReadTimeout" in error_str or "timeout" in error_str.lower():
-            error_type = ErrorType.MODEL_TIMEOUT
-        elif "ConnectionError" in error_str or "connection" in error_str.lower():
-            error_type = ErrorType.MODEL_CONNECTION
-        else:
-            error_type = ErrorType.MODEL_ERROR
-        
-        error_msg = get_error_message(error_type, sources=sources, error_details=error_str)
-        return {"answer": error_msg, "sources": sources}
-    except Exception as e:
-        # Catch-all for unexpected errors
-        print(f"[ERROR] Unexpected error during Ollama call: {repr(e)}")
-        error_msg = get_error_message(ErrorType.MODEL_ERROR, sources=sources, error_details=str(e))
-        return {"answer": error_msg, "sources": sources}
+        except httpx.TimeoutException:
+            # Handle timeout without logging user data
+            print("[ERROR] OpenRouter API timeout")
+            yield f"data: {json.dumps({'error': 'Request timeout'})}\n\n"
+        except Exception as e:
+            # Generic error handling - don't log potentially sensitive user data
+            print(f"[ERROR] Streaming error: {type(e).__name__}")
+            yield f"data: {json.dumps({'error': 'Streaming error'})}\n\n"
+    
+    return StreamingResponse(
+        stream_tokens(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
 
-    # Handle empty or invalid response
-    if not answer or answer.strip() == "":
-        print("[WARNING] Ollama returned empty answer string")
-        error_msg = get_error_message(ErrorType.MODEL_EMPTY_RESPONSE, sources=sources)
-        return {"answer": error_msg, "sources": sources}
 
-    # Save assistant response to memory if session_id provided
-    if req.session_id:
-        memory = get_memory()
-        memory.add_message(req.session_id, "assistant", answer, metadata={"sources": sources, "intent": intent.value})
-
-    return {"answer": answer, "sources": sources}
-
+# --- For local testing ---
+if __name__ == "__main__":
+    import uvicorn
+    print("[INFO] Starting development server...")
+    print("[INFO] Make sure OPENROUTER_API_KEY is set in environment for local testing")
+    print("[INFO] Example: export OPENROUTER_API_KEY=sk-or-v1-...")
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
