@@ -11,9 +11,9 @@ import os
 import sys
 from pathlib import Path
 from typing import Optional
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
 # Add backend to Python path for imports
@@ -43,6 +43,31 @@ if backend_app:
     # Mount the existing backend app under /api prefix
     app.mount("/api", backend_app)
     print("[INFO] Mounted existing backend app at /api")
+
+    # --- Redirects for legacy/root API paths to mounted backend (/api) ---
+    # These preserve method and body where appropriate by using 307 status codes.
+    @app.get("/model-info", include_in_schema=False)
+    async def model_info_redirect_get(request: Request):
+        """
+        Redirect GET /model-info -> /api/model-info.
+        """
+        return RedirectResponse(url="/api/model-info", status_code=307)
+
+    @app.post("/chat", include_in_schema=False)
+    async def chat_redirect_post(request: Request):
+        """
+        Redirect POST /chat -> /api/chat (307 to preserve POST body).
+        Clients that post to /chat will be forwarded to the mounted backend.
+        """
+        return RedirectResponse(url="/api/chat", status_code=307)
+
+    @app.post("/predict", include_in_schema=False)
+    async def predict_redirect_post(request: Request):
+        """
+        Redirect POST /predict -> /api/predict.
+        """
+        return RedirectResponse(url="/api/predict", status_code=307)
+
 else:
     # Provide stub API endpoints if backend is not available
     print("[INFO] Backend app not found, providing stub endpoints")
@@ -120,12 +145,12 @@ if UI_BUILD_PATH.exists() and UI_BUILD_PATH.is_dir():
     if index_file.exists():
         @app.get("/", response_class=HTMLResponse)
         async def serve_root():
-            """Serve the UI root page."""
+            """Serve the UI root page.""" 
             return index_file.read_text()
         
         @app.get("/{full_path:path}", response_class=HTMLResponse)
         async def serve_spa(full_path: str):
-            """Catch-all route for SPA - serves index.html for client-side routing."""
+            """Catch-all route for SPA - serves index.html for client-side routing.""" 
             # Don't intercept API routes
             if full_path.startswith("api/"):
                 return JSONResponse({"error": "Not found"}, status_code=404)
