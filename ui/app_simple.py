@@ -45,7 +45,7 @@ def api(path: str) -> str:
 
 st.set_page_config(
     page_title="EduMate - AI Module Convenor",
-    page_icon="📚",
+    page_icon="EM",
     layout="centered",
     initial_sidebar_state="expanded"
 )
@@ -54,7 +54,7 @@ st.set_page_config(
 st.markdown("""
     <style>
     /* Import modern font */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
     
     /* Global styling */
     * {
@@ -404,7 +404,7 @@ module convenor, providing tailored academic guidance and mentorship.
     st.divider()
 
     # What I Can Help With section
-    with st.expander("What I Can Help With", expanded=False):
+    with st.expander("What I Can Help With", expanded=True):
         st.markdown(
             """
 **Concept Clarification**
