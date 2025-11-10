@@ -1,18 +1,15 @@
 """
-Minimal FastAPI app for Google App Engine Standard deployment.
-Streams LLM responses from OpenRouter API using Google Secret Manager for credentials.
-
-This is a production-safe implementation for App Engine (Option 1):
-- GET /health: Health check endpoint
-- POST /chat: Streaming chat completions from OpenRouter API
-- Loads API key from Google Secret Manager (no secrets in code)
-- Implements timeout and error handling
-- Permissive CORS (TODO: restrict to FRONTEND_ORIGIN in production)
+Minimal FastAPI backend for EduMate.
+- GET /health: Health check
+- POST /chat: Streams LLM responses from OpenRouter (SSE)
+- Secrets:
+    * Prefers OPENROUTER_API_KEY from environment (Fly secrets)
+    * Falls back to Google Secret Manager if configured (optional)
 """
+
 import os
 import json
 from typing import List, Dict, Optional, Any
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,261 +17,174 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import httpx
 
-# Try to import Google Cloud Secret Manager (optional)
+# --- Optional Google Secret Manager imports ---
 try:
     from google.cloud import secretmanager  # type: ignore
-except ImportError:
+    from google.oauth2 import service_account  # type: ignore
+except Exception:  # pragma: no cover
     secretmanager = None
+    service_account = None
 
-
-# --- Configuration ---
-PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")  # Automatically set by App Engine
-OPENROUTER_API_KEY = None  # Will be loaded from Secret Manager at startup
+# --- Config ---
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_FRONTEND_URL = "https://edumate.streamlit.app"
-API_TIMEOUT_SECONDS = int(os.getenv("API_TIMEOUT", "60"))  # Configurable timeout
+PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
+API_TIMEOUT = httpx.Timeout(connect=15.0, read=120.0, write=30.0, pool=None)
+
+# Cache for the API key after first successful load
+OPENROUTER_API_KEY: Optional[str] = None
 
 
-# --- Secret Manager Integration ---
-def load_secret_from_gcp(secret_name: str) -> Optional[str]:
+# --- Key loading: ENV first, GSM second (lazy, safe for mounted apps) ---
+def get_openrouter_key() -> str:
     """
-    Load a secret from Google Cloud Secret Manager.
-    
-    Args:
-        secret_name: Name of the secret (e.g., 'OPENROUTER_API_KEY')
-    
-    Returns:
-        The secret value as a string, or None if Secret Manager is unavailable
-    
+    Returns the OpenRouter API key, preferring the OPENROUTER_API_KEY env var.
+    If not present, optionally loads from Google Secret Manager if configured.
+
     Raises:
-        RuntimeError: If secret cannot be loaded (when Secret Manager is available)
-    """
-    if not secretmanager:
-        return None
-    
-    if not PROJECT_ID:
-        raise RuntimeError("GOOGLE_CLOUD_PROJECT environment variable not set")
-    
-    client = secretmanager.SecretManagerServiceClient()
-    secret_path = f"projects/{PROJECT_ID}/secrets/{secret_name}/versions/latest"
-    
-    try:
-        response = client.access_secret_version(request={"name": secret_path})
-        # Decode and return immediately to minimize scope of sensitive data
-        return response.payload.data.decode("UTF-8")
-    except Exception:
-        # Raise without logging to avoid any potential data leakage
-        raise RuntimeError(f"Failed to load secret {secret_name}")
-
-
-# --- Application Lifecycle ---
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """
-    Application startup and shutdown lifecycle handler.
-    Loads secrets from environment or Secret Manager at startup.
+        RuntimeError if the key cannot be loaded.
     """
     global OPENROUTER_API_KEY
-    
-    # Try to load from environment first (for Fly.io and local testing)
-    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-    
-    # If not in environment, try GCP Secret Manager (for App Engine)
-    if not OPENROUTER_API_KEY:
-        # Check for custom secret name (allows flexibility)
-        gcp_secret_name = os.getenv("GCP_SECRET_NAME")
-        
-        if gcp_secret_name and secretmanager:
-            try:
-                # Parse full path or just secret name
-                if "/" in gcp_secret_name:
-                    # Full path provided (e.g., projects/xxx/secrets/yyy/versions/latest)
-                    client = secretmanager.SecretManagerServiceClient()
-                    response = client.access_secret_version(request={"name": gcp_secret_name})
-                    OPENROUTER_API_KEY = response.payload.data.decode("UTF-8")
-                else:
-                    # Just secret name provided
-                    OPENROUTER_API_KEY = load_secret_from_gcp(gcp_secret_name)
-            except Exception as e:
-                print(f"[WARNING] Failed to load from GCP Secret Manager: {e}")
-        elif PROJECT_ID and secretmanager:
-            # Default: try to load OPENROUTER_API_KEY from Secret Manager
-            try:
-                OPENROUTER_API_KEY = load_secret_from_gcp("OPENROUTER_API_KEY")
-            except RuntimeError as e:
-                # Log error here, outside the secret loading function
-                print(f"[WARNING] {e}")
-                print("[WARNING] API calls will fail without a valid API key")
-    
-    # Log success status without exposing secret
-    if OPENROUTER_API_KEY:
-        print("[INFO] API key configured successfully")
-    else:
-        print("[WARNING] OPENROUTER_API_KEY not set - API calls will fail")
-        print("[INFO] Set OPENROUTER_API_KEY env var or configure GCP_SECRET_NAME")
-    
-    yield
-    
-    # Cleanup (if needed)
-    print("[INFO] Shutting down...")
+    if OPENROUTER_API_KEY:  # cached after first successful load
+        return OPENROUTER_API_KEY
+
+    # 1) ENV (Fly secrets / local dev)
+    env_key = os.getenv("OPENROUTER_API_KEY")
+    if env_key:
+        OPENROUTER_API_KEY = env_key
+        return OPENROUTER_API_KEY
+
+    # 2) Optional: Google Secret Manager
+    gcp_secret_name = os.getenv("GCP_SECRET_NAME")  # can be full path or simple name
+    if gcp_secret_name and secretmanager:
+        try:
+            creds = None
+            sa_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+            if sa_json and service_account:
+                # Build credentials from in-memory JSON (no file needed)
+                creds = service_account.Credentials.from_service_account_info(json.loads(sa_json))
+
+            client = secretmanager.SecretManagerServiceClient(credentials=creds)
+            if "/" in gcp_secret_name:
+                # Full resource path provided
+                name = gcp_secret_name
+            else:
+                # Simple name provided, need project id
+                project = PROJECT_ID or os.getenv("GOOGLE_CLOUD_PROJECT")
+                if not project:
+                    raise RuntimeError("GOOGLE_CLOUD_PROJECT not set for Secret Manager lookup")
+                name = f"projects/{project}/secrets/{gcp_secret_name}/versions/latest"
+
+            resp = client.access_secret_version(request={"name": name})
+            OPENROUTER_API_KEY = resp.payload.data.decode("UTF-8")
+            return OPENROUTER_API_KEY
+        except Exception as e:  # do not log sensitive details
+            print(f"[WARNING] GCP Secret Manager lookup failed: {type(e).__name__}")
+
+    raise RuntimeError("OPENROUTER_API_KEY not configured. Set Fly secret or GCP Secret Manager.")
 
 
-# --- FastAPI App ---
+# --- FastAPI app ---
 app = FastAPI(
-    title="EduMate App Engine API",
-    version="0.1.0",
-    description="Minimal LLM proxy for App Engine Standard deployment",
-    lifespan=lifespan
+    title="EduMate API",
+    version="1.0.0",
+    description="Backend API that streams chat completions via OpenRouter",
 )
 
-# TODO: Restrict CORS to FRONTEND_ORIGIN only in production
-# For now, allow all origins for easier initial setup
+# CORS: keep permissive for initial setup; restrict in production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: Change to [os.getenv("FRONTEND_ORIGIN")] in production
+    allow_origins=["*"],  # set to [os.getenv("FRONTEND_ORIGIN")] in prod
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# --- Request/Response Models ---
+# --- Models ---
 class ChatRequest(BaseModel):
-    """
-    Chat request payload matching OpenRouter API format.
-    """
-    model: str = "openrouter/anthropic/claude-3.5-sonnet"
-    messages: List[Dict[str, Any]]  # Support complex message formats (function calls, etc.)
+    model: str = "openrouter/openai/gpt-4o-mini"
+    messages: List[Dict[str, Any]]
     temperature: float = 0.2
 
 
-# --- Health Check ---
+# --- Health ---
 @app.get("/health")
 def health():
-    """
-    Health check endpoint for App Engine load balancer.
-    
-    Returns:
-        dict: Status indicator
-    """
     return {"ok": True}
 
 
-# --- Chat Endpoint with Streaming ---
+# --- Chat (SSE streaming) ---
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    """
-    Stream chat completions from OpenRouter API.
-    
-    Accepts OpenAI-compatible chat format and streams tokens via Server-Sent Events (SSE).
-    Uses httpx.AsyncClient for streaming with proper timeout handling.
-    
-    Args:
-        request: ChatRequest with model, messages, and temperature
-    
-    Returns:
-        StreamingResponse: Server-Sent Events stream of chat tokens
-    
-    Raises:
-        HTTPException: If API key is not configured or request is invalid
-    
-    Note:
-        Never logs sensitive user content. Only logs error types for debugging.
-    """
-    if not OPENROUTER_API_KEY:
-        raise HTTPException(
-            status_code=500,
-            detail="OPENROUTER_API_KEY not configured. Please set up Secret Manager."
-        )
-    
-    # Validate request
+    # Validate
     if not request.messages:
         raise HTTPException(status_code=400, detail="No messages provided")
-    
-    # OpenRouter API endpoint (OpenAI-compatible)
-    url = OPENROUTER_API_URL
-    
+
+    # Load key lazily (works even when app is mounted under /api)
+    try:
+        api_key = get_openrouter_key()
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
+        # OpenRouter recommends these (non-sensitive):
         "HTTP-Referer": os.getenv("FRONTEND_ORIGIN", DEFAULT_FRONTEND_URL),
         "X-Title": "EduMate",
     }
-    
+
     payload = {
         "model": request.model,
         "messages": request.messages,
         "temperature": request.temperature,
-        "stream": True,  # Enable streaming
+        "stream": True,  # request SSE stream
     }
-    
-    # Stream response from OpenRouter
+
     async def stream_tokens():
-        """
-        Stream tokens from OpenRouter API as Server-Sent Events.
-        Implements proper error handling and timeout management.
-        Never logs user message content for privacy.
-        """
         try:
-            # Use httpx.AsyncClient with configurable timeout for streaming
-            async with httpx.AsyncClient(timeout=API_TIMEOUT_SECONDS) as client:
+            async with httpx.AsyncClient(timeout=API_TIMEOUT) as client:
                 async with client.stream(
                     "POST",
-                    url,
+                    OPENROUTER_API_URL,
                     headers=headers,
                     json=payload,
                 ) as response:
-                    # Handle API errors
                     if response.status_code != 200:
-                        # Don't log potentially sensitive error details
-                        print(f"[ERROR] OpenRouter API error: status={response.status_code}")
-                        yield f"data: {json.dumps({'error': 'API request failed'})}\n\n"
+                        # avoid leaking details; front-end can show a generic message
+                        print(f"[ERROR] OpenRouter error status={response.status_code}")
+                        yield f"data: {json.dumps({'error':'Upstream API error'})}\n\n"
                         return
-                    
-                    # Process SSE stream from OpenRouter
+
                     async for line in response.aiter_lines():
                         if not line:
                             continue
-                        
                         if line.startswith("data: "):
-                            data_str = line[6:]  # Remove "data: " prefix
-                            
-                            # Check for stream completion
-                            if data_str.strip() == "[DONE]":
+                            data_str = line[6:].strip()
+                            if data_str == "[DONE]":
                                 yield "data: [DONE]\n\n"
                                 break
-                            
-                            try:
-                                # Parse and forward SSE chunk to client
-                                data = json.loads(data_str)
-                                yield f"data: {json.dumps(data)}\n\n"
-                            except json.JSONDecodeError:
-                                # Ignore malformed JSON chunks (common in SSE streams)
-                                continue
-        
+                            # pass through the chunk as-is (client will parse it)
+                            yield f"data: {data_str}\n\n"
+
         except httpx.TimeoutException:
-            # Handle timeout without logging user data
             print("[ERROR] OpenRouter API timeout")
-            yield f"data: {json.dumps({'error': 'Request timeout'})}\n\n"
+            yield f"data: {json.dumps({'error':'Request timeout'})}\n\n"
         except Exception as e:
-            # Generic error handling - don't log potentially sensitive user data
             print(f"[ERROR] Streaming error: {type(e).__name__}")
-            yield f"data: {json.dumps({'error': 'Streaming error'})}\n\n"
-    
+            yield f"data: {json.dumps({'error':'Streaming error'})}\n\n"
+
     return StreamingResponse(
         stream_tokens(),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        }
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
 
 
-# --- For local testing ---
+# --- Local dev entrypoint ---
 if __name__ == "__main__":
     import uvicorn
-    print("[INFO] Starting development server...")
-    print("[INFO] Make sure OPENROUTER_API_KEY is set in environment for local testing")
-    print("[INFO] Example: export OPENROUTER_API_KEY=sk-or-v1-...")
+    print("[INFO] Starting dev server on http://0.0.0.0:8080")
+    print("[INFO] Ensure OPENROUTER_API_KEY is set for local testing")
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
