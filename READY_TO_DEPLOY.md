@@ -41,16 +41,39 @@ fly auth login
 # Deploy from repository root
 fly launch --copy-config --yes
 
-# Set your OpenRouter API key (get free credits at openrouter.ai)
+# Set your OpenRouter API key (REQUIRED - get free credits at openrouter.ai)
 fly secrets set OPENROUTER_API_KEY=sk-or-v1-your-key-here
+
+# Optional: If using GCP Secret Manager instead of environment variable
+fly secrets set GCP_SECRET_NAME=projects/<project-id>/secrets/<name>/versions/latest
 
 # Deploy
 fly deploy
 
-# Verify
+# Verify deployment
 fly status
-curl https://your-app-name.fly.dev/health
+fly logs
+
+# Expected log output:
+# [INFO] API key configured successfully
+# [INFO] Mounted existing backend app at /api
+# Backend mounted: True
+
+# Smoke tests - verify API is working
+curl https://edumate-local-api.fly.dev/health
+# Expected: {"ok":true}
+
+curl -X POST https://edumate-local-api.fly.dev/chat \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"Hello"}]}'
+# Expected: Streaming response (not 404)
 ```
+
+**Important Notes:**
+- The app name in `fly.toml` is `edumate-local-api`, so your URL will be `https://edumate-local-api.fly.dev`
+- Backend must mount at `/api` (logs will confirm: "Mounted existing backend app at /api")
+- Without `OPENROUTER_API_KEY`, `/chat` will return 500 error
+- Health endpoint (`/health`) works without API key
 
 #### Step 2: Deploy Frontend to Streamlit Cloud (3 minutes)
 
@@ -59,9 +82,10 @@ curl https://your-app-name.fly.dev/health
 3. Click "New app"
 4. Select your forked repo
 5. Set main file: `ui/app_simple.py`
-6. If your app name differs from "edumate-local":
-   - Advanced settings → Environment variables
-   - Add: `EDUMATE_API_BASE` = `https://your-app-name.fly.dev`
+6. **Important**: The UI now defaults to `https://edumate-local-api.fly.dev`
+   - No environment variable needed if you use the default app name
+   - If your Fly app name differs, set in Advanced settings → Environment variables:
+     - Add: `EDUMATE_API_BASE` = `https://your-app-name.fly.dev`
 7. Click "Deploy!"
 
 ### 📚 Documentation

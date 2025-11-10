@@ -10,10 +10,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential gcc \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY requirements.txt backend/requirements.txt ./
 
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt -r backend.requirements.txt || \
+    pip install -r requirements.txt && echo "backend/requirements.txt missing, proceeding"
 
 COPY . .
 

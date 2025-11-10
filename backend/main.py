@@ -19,7 +19,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import httpx
-from google.cloud import secretmanager
+
+# Try to import Google Cloud Secret Manager (optional)
+try:
+    from google.cloud import secretmanager  # type: ignore
+except ImportError:
+    secretmanager = None
 
 
 # --- Configuration ---
@@ -31,7 +36,7 @@ API_TIMEOUT_SECONDS = int(os.getenv("API_TIMEOUT", "60"))  # Configurable timeou
 
 
 # --- Secret Manager Integration ---
-def load_secret_from_gcp(secret_name: str) -> str:
+def load_secret_from_gcp(secret_name: str) -> Optional[str]:
     """
     Load a secret from Google Cloud Secret Manager.
     
@@ -39,11 +44,14 @@ def load_secret_from_gcp(secret_name: str) -> str:
         secret_name: Name of the secret (e.g., 'OPENROUTER_API_KEY')
     
     Returns:
-        The secret value as a string
+        The secret value as a string, or None if Secret Manager is unavailable
     
     Raises:
-        RuntimeError: If secret cannot be loaded
+        RuntimeError: If secret cannot be loaded (when Secret Manager is available)
     """
+    if not secretmanager:
+        return None
+    
     if not PROJECT_ID:
         raise RuntimeError("GOOGLE_CLOUD_PROJECT environment variable not set")
     
@@ -64,27 +72,46 @@ def load_secret_from_gcp(secret_name: str) -> str:
 async def lifespan(app: FastAPI):
     """
     Application startup and shutdown lifecycle handler.
-    Loads secrets from Secret Manager at startup.
+    Loads secrets from environment or Secret Manager at startup.
     """
     global OPENROUTER_API_KEY
     
-    # Try to load from environment first (for local testing)
+    # Try to load from environment first (for Fly.io and local testing)
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     
-    # If not in environment, load from Secret Manager (production on App Engine)
-    if not OPENROUTER_API_KEY and PROJECT_ID:
-        try:
-            OPENROUTER_API_KEY = load_secret_from_gcp("OPENROUTER_API_KEY")
-        except RuntimeError as e:
-            # Log error here, outside the secret loading function
-            print(f"[WARNING] {e}")
-            print("[WARNING] API calls will fail without a valid API key")
+    # If not in environment, try GCP Secret Manager (for App Engine)
+    if not OPENROUTER_API_KEY:
+        # Check for custom secret name (allows flexibility)
+        gcp_secret_name = os.getenv("GCP_SECRET_NAME")
+        
+        if gcp_secret_name and secretmanager:
+            try:
+                # Parse full path or just secret name
+                if "/" in gcp_secret_name:
+                    # Full path provided (e.g., projects/xxx/secrets/yyy/versions/latest)
+                    client = secretmanager.SecretManagerServiceClient()
+                    response = client.access_secret_version(request={"name": gcp_secret_name})
+                    OPENROUTER_API_KEY = response.payload.data.decode("UTF-8")
+                else:
+                    # Just secret name provided
+                    OPENROUTER_API_KEY = load_secret_from_gcp(gcp_secret_name)
+            except Exception as e:
+                print(f"[WARNING] Failed to load from GCP Secret Manager: {e}")
+        elif PROJECT_ID and secretmanager:
+            # Default: try to load OPENROUTER_API_KEY from Secret Manager
+            try:
+                OPENROUTER_API_KEY = load_secret_from_gcp("OPENROUTER_API_KEY")
+            except RuntimeError as e:
+                # Log error here, outside the secret loading function
+                print(f"[WARNING] {e}")
+                print("[WARNING] API calls will fail without a valid API key")
     
     # Log success status without exposing secret
     if OPENROUTER_API_KEY:
         print("[INFO] API key configured successfully")
     else:
         print("[WARNING] OPENROUTER_API_KEY not set - API calls will fail")
+        print("[INFO] Set OPENROUTER_API_KEY env var or configure GCP_SECRET_NAME")
     
     yield
     
