@@ -313,104 +313,122 @@ if user_input := st.chat_input("💬 Ask me anything about your course... (e.g.,
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Get assistant response
-    with st.chat_message("assistant"):
-        with st.spinner("🤔 Thinking..."):
-            try:
-                resp = requests.post(
-                    api("/chat"),
-                    json={
-                        "messages": st.session_state.messages,
-                        "session_id": st.session_state.session_id,
-                    },
-                    timeout=120,
-                )
-                resp.raise_for_status()
-                data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
-                answer = data.get("answer") or data.get("message") or "I couldn't generate a response."
-                sources = data.get("sources", [])
+    # Get assistant response (SSE streaming)
+with st.chat_message("assistant"):
+    with st.spinner("🤔 Thinking..."):
+        try:
+            payload = {
+                "model": WORKING_MODEL,                # <- explicit, known-good model
+                "messages": st.session_state.messages,
+                "temperature": 0.2,
+            }
 
-                st.markdown(answer)
+            # Ask backend to stream (SSE)
+            resp = requests.post(
+                api("/chat"),
+                json=payload,
+                timeout=120,
+                stream=True,
+            )
+            resp.raise_for_status()
 
-                if sources:
-                    st.markdown("---")
-                    with st.expander("📚 **View Sources & References**", expanded=False):
-                        st.markdown("*These sources were used to generate the response:*")
-                        st.markdown("")
-                        for i, s in enumerate(sources, 1):
-                            # Turn plain URLs into clickable links with better formatting
-                            if isinstance(s, str) and (s.startswith("http://") or s.startswith("https://")):
-                                st.markdown(f"**{i}.** 🔗 [{s}]({s})")
-                            else:
-                                st.markdown(f"**{i}.** 📄 {s}")
+            # Render streamed tokens as they arrive
+            full = ""
+            placeholder = st.empty()
 
-                # Persist assistant reply
-                st.session_state.messages.append({"role": "assistant", "content": answer})
-                st.session_state.api_status = "online"
+            for line in resp.iter_lines(decode_unicode=True):
+                if not line:
+                    continue
+                if not line.startswith("data: "):
+                    continue
 
-            except requests.exceptions.ConnectionError:
-                error_msg = (
-                    "## ❌ Connection Error\n\n"
-                    f"Cannot connect to the backend API at:\n\n"
-                    f"`{API_BASE_URL}`\n\n"
-                    "### 🔍 Possible Causes\n"
-                    "- Backend server is not running or unavailable\n"
-                    "- Incorrect API URL configuration\n"
-                    "- Network connectivity issues\n\n"
-                    "### 💡 What You Can Do\n"
-                    "1. Check if the backend is deployed and running\n"
-                    "2. Verify the API URL in the sidebar\n"
-                    "3. Wait a moment and try again\n"
-                    "4. Contact support if the issue persists"
-                )
-                st.error(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
-                st.session_state.api_status = "offline"
+                data_str = line[6:].strip()
 
-            except requests.exceptions.Timeout:
-                error_msg = (
-                    "## ⏱️ Request Timeout\n\n"
-                    "The request took too long to complete (>120 seconds).\n\n"
-                    "### 💡 What You Can Do\n"
-                    "1. Try asking a simpler or more specific question\n"
-                    "2. Wait a moment and try again\n"
-                    "3. The backend may be warming up after being idle\n"
-                    "4. Check your internet connection"
-                )
-                st.warning(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+                if data_str == "[DONE]":
+                    break
 
-            except requests.HTTPError as e:
+                # Each chunk looks like OpenAI-style delta JSON
+                # {"choices":[{"delta":{"content":"..."}}], ...}
                 try:
-                    detail = e.response.text[:300]
+                    chunk = json.loads(data_str)
+                    delta = chunk.get("choices", [{}])[0].get("delta", {})
+                    token = delta.get("content", "")
+                    if token:
+                        full += token
+                        placeholder.markdown(full)
                 except Exception:
-                    detail = ""
-                error_msg = (
-                    f"## ❌ API Error (Status: {e.response.status_code})\n\n"
-                    f"The backend returned an error.\n\n"
-                    f"**Details:** {detail if detail else 'No additional information available'}\n\n"
-                    "### 💡 What You Can Do\n"
-                    "1. Try rephrasing your question\n"
-                    "2. Check backend logs for more details\n"
-                    "3. Wait a moment and try again\n"
-                    "4. Contact support if the issue persists"
-                )
-                st.error(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
-                st.session_state.api_status = "error"
+                    # ignore keepalives or malformed fragments
+                    pass
 
-            except Exception as e:
-                error_msg = (
-                    "## ❌ Unexpected Error\n\n"
-                    f"Something went wrong:\n\n"
-                    f"```\n{str(e)}\n```\n\n"
-                    "### 💡 What You Can Do\n"
-                    "1. Try your question again\n"
-                    "2. Refresh the page if the issue persists\n"
-                    "3. Contact support and report this error"
-                )
-                st.error(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+            # Persist final assistant reply
+            answer = full if full.strip() else "I couldn't generate a response."
+            st.session_state.messages.append({"role": "assistant", "content": answer})
+            st.session_state.api_status = "online"
+
+        except requests.exceptions.ConnectionError:
+            error_msg = (
+                "## ❌ Connection Error\n\n"
+                f"Cannot connect to the backend API at:\n\n"
+                f"`{API_BASE_URL}`\n\n"
+                "### 🔍 Possible Causes\n"
+                "- Backend server is not running or unavailable\n"
+                "- Incorrect API URL configuration\n"
+                "- Network connectivity issues\n\n"
+                "### 💡 What You Can Do\n"
+                "1. Check if the backend is deployed and running\n"
+                "2. Verify the API URL in the sidebar\n"
+                "3. Wait a moment and try again\n"
+                "4. Contact support if the issue persists"
+            )
+            st.error(error_msg)
+            st.session_state.messages.append({"role": "assistant", "content": error_msg})
+            st.session_state.api_status = "offline"
+
+        except requests.exceptions.Timeout:
+            error_msg = (
+                "## ⏱️ Request Timeout\n\n"
+                "The request took too long to complete (>120 seconds).\n\n"
+                "### 💡 What You Can Do\n"
+                "1. Try asking a simpler or more specific question\n"
+                "2. Wait a moment and try again\n"
+                "3. The backend may be warming up after being idle\n"
+                "4. Check your internet connection"
+            )
+            st.warning(error_msg)
+            st.session_state.messages.append({"role": "assistant", "content": error_msg})
+
+        except requests.HTTPError as e:
+            try:
+                detail = e.response.text[:600]
+            except Exception:
+                detail = ""
+            error_msg = (
+                f"## ❌ API Error (Status: {e.response.status_code})\n\n"
+                f"The backend returned an error.\n\n"
+                f"**Details:** {detail if detail else 'No additional information available'}\n\n"
+                "### 💡 What You Can Do\n"
+                "1. Try rephrasing your question\n"
+                "2. Check backend logs for more details\n"
+                "3. Wait a moment and try again\n"
+                "4. Contact support if the issue persists"
+            )
+            st.error(error_msg)
+            st.session_state.messages.append({"role": "assistant", "content": error_msg})
+            st.session_state.api_status = "error"
+
+        except Exception as e:
+            error_msg = (
+                "## ❌ Unexpected Error\n\n"
+                f"Something went wrong:\n\n"
+                f"```\n{str(e)}\n```\n\n"
+                "### 💡 What You Can Do\n"
+                "1. Try your question again\n"
+                "2. Refresh the page if the issue persists\n"
+                "3. Contact support and report this error"
+            )
+            st.error(error_msg)
+            st.session_state.messages.append({"role": "assistant", "content": error_msg})
+
 
 # ============================================================================
 # Sidebar
